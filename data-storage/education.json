@@ -1,0 +1,54 @@
+[
+  {
+    "_id": "btech",
+    "id": "btech",
+    "degree": "Bachelor of Technology in Computer Science & Engineering",
+    "duration": "2023 - 2027",
+    "institute": "Sityog Institute of Technology | (Bihar Engineering University, Patna)",
+    "grade": "Current CGPA: 7.49",
+    "status": "Pursuing (Undergraduate)",
+    "category": "engineering",
+    "categoryLabel": "Engineering & Technology",
+    "icon": "fas fa-graduation-cap",
+    "highlights": [
+      "Specialized in Computer Science, AI/ML, and Software Architecture.",
+      "Core Coursework: Data Structures & Algorithms, Operating Systems, Database Management Systems, Object Oriented Programming, Machine Learning.",
+      "Active developer contributor and student technical hackathon leader."
+    ],
+    "skills": [
+      "C++",
+      "Python",
+      "Data Structures",
+      "Database Systems",
+      "AI/ML"
+    ],
+    "createdAt": "2026-11-09T11:58:41.761Z",
+    "updatedAt": "2026-11-09T11:58:41.761Z"
+  },
+  {
+    "_id": "bsc-math",
+    "id": "bsc-math",
+    "degree": "Bachelor of Science in Mathematics",
+    "duration": "2020 - 2023",
+    "institute": "Magadh University Bodh Gaya",
+    "grade": "Percentage: 66.5%",
+    "status": "Completed (First Class)",
+    "category": "sciences",
+    "categoryLabel": "Mathematical Sciences",
+    "icon": "fas fa-square-root-variable",
+    "highlights": [
+      "Comprehensive study of Linear Algebra, Differential Calculus, Probability, and Numerical Analysis.",
+      "Rigorous analytical foundation leveraged directly in Neural Network math and Machine Learning algorithms.",
+      "Graduated with First Class distinction in Mathematics."
+    ],
+    "skills": [
+      "Linear Algebra",
+      "Calculus",
+      "Probability",
+      "Statistics",
+      "Numerical Methods"
+    ],
+    "createdAt": "2026-11-09T11:58:41.908Z",
+    "updatedAt": "2026-11-09T11:58:41.908Z"
+  }
+]

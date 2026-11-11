@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "projects": {
+      "title": "Project",
+      "description": "Portfolio project item",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "tech": { "type": "array" },
+        "githubUrl": { "type": "string", "maxLength": 300 },
+        "liveUrl": { "type": "string", "maxLength": 300 },
+        "image": { "type": "string", "maxLength": 500 },
+        "authorUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "description", "authorUid"]
+    },
+    "certifications": {
+      "title": "Certification",
+      "description": "Professional certificate item",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 150 },
+        "issuer": { "type": "string", "maxLength": 150 },
+        "date": { "type": "string", "maxLength": 50 },
+        "category": { "type": "string", "maxLength": 50 },
+        "certificate": { "type": "object" },
+        "authorUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "issuer", "authorUid"]
+    },
+    "education": {
+      "title": "Education",
+      "description": "Academic degree or qualification",
+      "type": "object",
+      "properties": {
+        "degree": { "type": "string", "maxLength": 150 },
+        "institute": { "type": "string", "maxLength": 200 },
+        "duration": { "type": "string", "maxLength": 80 },
+        "grade": { "type": "string", "maxLength": 50 },
+        "category": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "maxLength": 50 },
+        "highlights": { "type": "array" },
+        "skills": { "type": "array" },
+        "authorUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["degree", "institute", "authorUid"]
+    },
+    "skills": {
+      "title": "Skill",
+      "description": "Technical capability item",
+      "type": "object",
+      "properties": {
+        "domainId": { "type": "string", "maxLength": 80 },
+        "name": { "type": "string", "maxLength": 80 },
+        "level": { "type": "string", "maxLength": 50 },
+        "icon": { "type": "string", "maxLength": 80 },
+        "highlight": { "type": "boolean" },
+        "authorUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["domainId", "name", "authorUid"]
+    },
+    "experience": {
+      "title": "Experience",
+      "description": "Work experience or internship record",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "maxLength": 150 },
+        "company": { "type": "string", "maxLength": 150 },
+        "duration": { "type": "string", "maxLength": 80 },
+        "category": { "type": "string", "maxLength": 50 },
+        "details": { "type": "array" },
+        "tech": { "type": "array" },
+        "certificate": { "type": "object" },
+        "authorUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["role", "company", "authorUid"]
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "Global portfolio profile and photos configuration",
+      "type": "object",
+      "properties": {
+        "heroImage": { "type": "string", "maxLength": 500 },
+        "aboutImage": { "type": "string", "maxLength": 500 },
+        "logoImage": { "type": "string", "maxLength": 500 },
+        "name": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "bioLead": { "type": "string", "maxLength": 500 },
+        "resumeUrl": { "type": "string", "maxLength": 500 },
+        "authorUid": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["authorUid"]
+    },
+    "admins": {
+      "title": "Admin",
+      "description": "Whitelisted administrator accounts",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["email", "role"]
+    },
+    "audit_logs": {
+      "title": "AuditLog",
+      "description": "Historical audit log tracking mutations to portfolio collections",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string" },
+        "action": { "type": "string", "maxLength": 20 },
+        "collectionName": { "type": "string", "maxLength": 50 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "targetTitle": { "type": "string", "maxLength": 200 },
+        "changedBy": { "type": "object" },
+        "diff": { "type": "object" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["action", "collectionName", "targetId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "projects",
+      "description": "Collection of featured portfolio projects"
+    },
+    "/certifications/{certId}": {
+      "schema": "certifications",
+      "description": "Collection of professional certificates"
+    },
+    "/education/{eduId}": {
+      "schema": "education",
+      "description": "Collection of education qualifications"
+    },
+    "/skills/{skillId}": {
+      "schema": "skills",
+      "description": "Collection of domain skills and technologies"
+    },
+    "/experience/{expId}": {
+      "schema": "experience",
+      "description": "Collection of work experience and internships"
+    },
+    "/profile/{profileId}": {
+      "schema": "profile",
+      "description": "Portfolio profile settings and photo references"
+    },
+    "/admins/{adminUid}": {
+      "schema": "admins",
+      "description": "Designated administrator identifiers"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "audit_logs",
+      "description": "Immutable audit log records of mutations to projects and experience collections"
+    }
+  }
+}

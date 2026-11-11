@@ -1,0 +1,4003 @@
+[
+  {
+    "id": "audit_1794408383587_9hnxwc",
+    "timestamp": "2026-11-11T14:46:23.587Z",
+    "action": "DELETE",
+    "collectionName": "messages",
+    "targetId": "msg_1",
+    "targetTitle": "Emily Davis — Senior AI Engineer Opportunity",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "msg_1",
+        "id": "msg_1",
+        "name": "Emily Davis",
+        "email": "emily.davis@techventures.io",
+        "subject": "Senior AI Engineer Opportunity",
+        "message": "Hi Sachin, we were deeply impressed by your ML and Full-Stack background. Would love to connect for a quick intro call.",
+        "timestamp": "2026-11-08T15:31:44.719Z",
+        "status": "read",
+        "createdAt": "2026-11-10T15:31:44.719Z",
+        "updatedAt": "2026-11-10T15:31:44.719Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/contact/messages/msg_1"
+    },
+    "_id": "audit_1794408383587_9hnxwc",
+    "createdAt": "2026-11-11T14:46:23.587Z",
+    "updatedAt": "2026-11-11T14:46:23.587Z"
+  },
+  {
+    "id": "audit_1794408355714_b5ki9s",
+    "timestamp": "2026-11-11T14:45:55.714Z",
+    "action": "CREATE",
+    "collectionName": "messages",
+    "targetId": "msg_1794408355621_fjfjy",
+    "targetTitle": "Aman sharma — Hello from your Portfolio!",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "id": "msg_1794408355621_fjfjy",
+        "name": "Aman sharma",
+        "email": "aman@gmail.com",
+        "subject": "Hello from your Portfolio!",
+        "message": "Hii, just a testing purpose.",
+        "inquiryType": "general",
+        "emailSent": true,
+        "timestamp": "2026-11-11T14:45:55.621Z",
+        "createdAt": "2026-11-11T14:45:55.621Z",
+        "status": "unread",
+        "_id": "msg_1794408355621_fjfjy",
+        "updatedAt": "2026-11-11T14:45:55.621Z"
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/contact"
+    },
+    "_id": "audit_1794408355714_b5ki9s",
+    "createdAt": "2026-11-11T14:45:55.715Z",
+    "updatedAt": "2026-11-11T14:45:55.715Z"
+  },
+  {
+    "id": "audit_1794408000131_b43tuo",
+    "timestamp": "2026-11-11T14:40:00.131Z",
+    "action": "DELETE",
+    "collectionName": "messages",
+    "targetId": "msg_2",
+    "targetTitle": "Rahul Sharma — Consulting on Distributed Systems",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "msg_2",
+        "id": "msg_2",
+        "name": "Rahul Sharma",
+        "email": "rahul.s@cloudscale.dev",
+        "subject": "Consulting on Distributed Systems",
+        "message": "Hey Sachin! Loved your projects on GitHub. Are you available for contract or consulting work in Q2?",
+        "timestamp": "2026-11-09T15:31:44.719Z",
+        "status": "read",
+        "createdAt": "2026-11-10T15:31:44.719Z",
+        "updatedAt": "2026-11-11T14:38:36.041Z",
+        "readAt": "2026-11-11T14:38:36.040Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/contact/messages/msg_2"
+    },
+    "_id": "audit_1794408000131_b43tuo",
+    "createdAt": "2026-11-11T14:40:00.132Z",
+    "updatedAt": "2026-11-11T14:40:00.132Z"
+  },
+  {
+    "_id": "audit_1794398920867_sio033",
+    "id": "audit_1794398920867_sio033",
+    "timestamp": "2026-11-11T12:08:40.867Z",
+    "action": "UPDATE",
+    "collectionName": "profile",
+    "targetId": "config",
+    "targetTitle": "Profile & Photos Configuration (Sachin Kumar)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "config",
+        "id": "config",
+        "name": "Sachin Kumar",
+        "title": "Full Stack Engineer & Cloud Architect",
+        "authorUid": "sachin@portfolio",
+        "updatedAt": "2026-11-11T10:04:36.067Z",
+        "createdAt": "2026-11-09T10:42:34.326Z",
+        "aboutImage": "/assets/aistudio/dev-intro-card_360f1a33.svg",
+        "bioLead": "Building intelligent solutions and cutting-edge web applications with a focus on user experience and performance.",
+        "heroImage": "[Uploaded Media/PDF (160 KB)]",
+        "logoImage": "/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png",
+        "resumeUrl": "[Uploaded Media/PDF (171 KB)]"
+      },
+      "after": {
+        "_id": "config",
+        "id": "config",
+        "name": "Sachin Kumar",
+        "title": "Software Engineer & AI/ML Developer",
+        "authorUid": "sachin@portfolio",
+        "updatedAt": "2026-11-11T12:08:40.866Z",
+        "createdAt": "2026-11-09T10:42:34.326Z",
+        "aboutImage": "/assets/aistudio/dev-intro-card_360f1a33.svg",
+        "bioLead": "Building intelligent solutions and cutting-edge web applications with a focus on user experience and performance.",
+        "heroImage": "/assets/aistudio/Polished_Corporate_Headshot_on_Gray_77b053e0.png",
+        "logoImage": "/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png",
+        "resumeUrl": "/certificates/resume.pdf"
+      },
+      "modifiedFields": [
+        "heroImage",
+        "aboutImage",
+        "logoImage",
+        "resumeUrl",
+        "name",
+        "title",
+        "bioLead",
+        "authorUid"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/profile"
+    },
+    "createdAt": "2026-11-11T12:08:40.867Z",
+    "updatedAt": "2026-11-11T12:08:40.867Z"
+  },
+  {
+    "_id": "audit_1794391476070_bz0s3c",
+    "id": "audit_1794391476070_bz0s3c",
+    "timestamp": "2026-11-11T10:04:36.070Z",
+    "action": "UPDATE",
+    "collectionName": "profile",
+    "targetId": "config",
+    "targetTitle": "Profile & Photos Configuration (Sachin Kumar)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "config",
+        "id": "config",
+        "name": "Sachin Kumar",
+        "title": "Full Stack Engineer & Cloud Architect",
+        "authorUid": "sachin@portfolio",
+        "updatedAt": "2026-11-11T09:50:03.138Z",
+        "createdAt": "2026-11-09T10:42:34.326Z",
+        "heroImage": "[Uploaded Media/PDF (156 KB)]",
+        "aboutImage": "/assets/aistudio/dev-intro-card_360f1a33.svg",
+        "logoImage": "/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png",
+        "resumeUrl": "[Uploaded Media/PDF (171 KB)]",
+        "bioLead": "Building intelligent solutions and cutting-edge web applications with a focus on user experience and performance."
+      },
+      "after": {
+        "_id": "config",
+        "id": "config",
+        "name": "Sachin Kumar",
+        "title": "Full Stack Engineer & Cloud Architect",
+        "authorUid": "sachin@portfolio",
+        "updatedAt": "2026-11-11T10:04:36.067Z",
+        "createdAt": "2026-11-09T10:42:34.326Z",
+        "heroImage": "[Uploaded Media/PDF (160 KB)]",
+        "aboutImage": "/assets/aistudio/dev-intro-card_360f1a33.svg",
+        "logoImage": "/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png",
+        "resumeUrl": "[Uploaded Media/PDF (171 KB)]",
+        "bioLead": "Building intelligent solutions and cutting-edge web applications with a focus on user experience and performance."
+      },
+      "modifiedFields": [
+        "heroImage",
+        "aboutImage",
+        "logoImage",
+        "resumeUrl",
+        "name",
+        "title",
+        "bioLead",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/profile"
+    },
+    "createdAt": "2026-11-11T10:04:36.070Z",
+    "updatedAt": "2026-11-11T10:04:36.070Z"
+  },
+  {
+    "_id": "audit_1794390603143_x5xqj8",
+    "id": "audit_1794390603143_x5xqj8",
+    "timestamp": "2026-11-11T09:50:03.143Z",
+    "action": "UPDATE",
+    "collectionName": "profile",
+    "targetId": "config",
+    "targetTitle": "Profile & Photos Configuration (Sachin Kumar)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "config",
+        "id": "config",
+        "name": "Sachin Kumar",
+        "title": "Full Stack Engineer & Cloud Architect",
+        "authorUid": "admin",
+        "updatedAt": "2026-11-09T10:45:12.602Z",
+        "createdAt": "2026-11-09T10:42:34.326Z"
+      },
+      "after": {
+        "_id": "config",
+        "id": "config",
+        "name": "Sachin Kumar",
+        "title": "Full Stack Engineer & Cloud Architect",
+        "authorUid": "sachin@portfolio",
+        "updatedAt": "2026-11-11T09:50:03.138Z",
+        "createdAt": "2026-11-09T10:42:34.326Z",
+        "heroImage": "[Uploaded Media/PDF (156 KB)]",
+        "aboutImage": "/assets/aistudio/dev-intro-card_360f1a33.svg",
+        "logoImage": "/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png",
+        "resumeUrl": "[Uploaded Media/PDF (171 KB)]",
+        "bioLead": "Building intelligent solutions and cutting-edge web applications with a focus on user experience and performance."
+      },
+      "modifiedFields": [
+        "heroImage",
+        "aboutImage",
+        "logoImage",
+        "resumeUrl",
+        "name",
+        "title",
+        "bioLead",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/profile"
+    },
+    "createdAt": "2026-11-11T09:50:03.143Z",
+    "updatedAt": "2026-11-11T09:50:03.143Z"
+  },
+  {
+    "_id": "audit_1794397093964_lbjnah",
+    "id": "audit_1794397093964_lbjnah",
+    "timestamp": "2026-11-11T11:38:13.964Z",
+    "action": "DELETE",
+    "collectionName": "skills",
+    "targetId": "skill_tools-devops_3_docker_essentials",
+    "targetTitle": "Docker Essentials (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "id": "skill_tools-devops_3_docker_essentials",
+        "_id": "skill_tools-devops_3_docker_essentials",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "name": "Docker Essentials",
+        "level": "Proficient",
+        "icon": "fab fa-docker",
+        "highlight": false,
+        "createdAt": "2026-11-10T12:46:44.130Z",
+        "updatedAt": "2026-11-10T12:46:44.130Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/skills/skill_tools-devops_3_docker_essentials"
+    },
+    "createdAt": "2026-11-11T11:38:13.964Z",
+    "updatedAt": "2026-11-11T11:38:13.964Z"
+  },
+  {
+    "_id": "audit_1794397084409_ysqc6o",
+    "id": "audit_1794397084409_ysqc6o",
+    "timestamp": "2026-11-11T11:38:04.409Z",
+    "action": "DELETE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794329993576_pc3k9",
+    "targetTitle": "TCS AI Hackathon Certificate (TCS ION)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "cert_1794329993576_pc3k9",
+        "title": "TCS AI Hackathon Certificate",
+        "issuer": "TCS ION",
+        "date": "5th Nov 2026",
+        "category": "other",
+        "categoryLabel": "Other Courses",
+        "credentialId": "SK-993567",
+        "skills": [],
+        "image": "[Uploaded Media/PDF (4590 KB)]",
+        "file": "[Uploaded Media/PDF (4590 KB)]",
+        "preview": "[Uploaded Media/PDF (4590 KB)]",
+        "link": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "id": "cert_1794329993576_pc3k9",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-10T17:00:32.951Z",
+        "updatedAt": "2026-11-10T17:00:32.951Z",
+        "verifyUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "credentialUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/certifications/cert_1794329993576_pc3k9"
+    },
+    "createdAt": "2026-11-11T11:38:04.410Z",
+    "updatedAt": "2026-11-11T11:38:04.410Z"
+  },
+  {
+    "_id": "audit_1794395635900_qkkgz9",
+    "id": "audit_1794395635900_qkkgz9",
+    "timestamp": "2026-11-11T11:13:55.900Z",
+    "action": "DELETE",
+    "collectionName": "skills",
+    "targetId": "skill_1794395252086_r6olu",
+    "targetTitle": "javaptr ioj (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "name": "javaptr ioj",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "level": "Advanced",
+        "icon": "fab fa-react",
+        "highlight": false,
+        "featured": false,
+        "id": "skill_1794395252086_r6olu",
+        "_id": "skill_1794395252086_r6olu",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:07:32.605Z",
+        "updatedAt": "2026-11-11T11:09:54.739Z",
+        "category": "DevOps & Developer Tools",
+        "proficiency": 85
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/skills/skill_1794395252086_r6olu"
+    },
+    "createdAt": "2026-11-11T11:13:55.900Z",
+    "updatedAt": "2026-11-11T11:13:55.900Z"
+  },
+  {
+    "_id": "audit_1794395620315_e4pgph",
+    "id": "audit_1794395620315_e4pgph",
+    "timestamp": "2026-11-11T11:13:40.315Z",
+    "action": "DELETE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794395201757_5msbz",
+    "targetTitle": "infosys (IBM SkillsBuild / Coursera)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "title": "infosys",
+        "issuer": "IBM SkillsBuild / Coursera",
+        "date": "2025",
+        "category": "web",
+        "categoryLabel": "Web Development",
+        "credentialId": "SK-201748",
+        "skills": [],
+        "image": "[Uploaded Media/PDF (171 KB)]",
+        "file": "[Uploaded Media/PDF (171 KB)]",
+        "preview": "[Uploaded Media/PDF (171 KB)]",
+        "link": "/certificates/previews/ibm-web-dev.png",
+        "id": "cert_1794395201757_5msbz",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:42.261Z",
+        "updatedAt": "2026-11-11T11:09:32.043Z",
+        "_id": "cert_1794395201757_5msbz",
+        "verifyUrl": "/certificates/previews/ibm-web-dev.png",
+        "credentialUrl": "/certificates/previews/ibm-web-dev.png",
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/certifications/cert_1794395201757_5msbz"
+    },
+    "createdAt": "2026-11-11T11:13:40.315Z",
+    "updatedAt": "2026-11-11T11:13:40.315Z"
+  },
+  {
+    "_id": "audit_1794395584467_s70v72",
+    "id": "audit_1794395584467_s70v72",
+    "timestamp": "2026-11-11T11:13:04.468Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794395185946_2b9h7",
+    "targetTitle": "AI & Machine Learning Intern at tcs ion",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs ion",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": {
+          "id": "cert_1794395220475",
+          "title": "AI & Machine Learning Intern - tcs Certificate",
+          "issuer": "tcs",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (171 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794395185946_2b9h7",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:26.493Z",
+        "updatedAt": "2026-11-11T11:09:11.466Z",
+        "_id": "exp_1794395185946_2b9h7",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794395185946_2b9h7"
+    },
+    "createdAt": "2026-11-11T11:13:04.468Z",
+    "updatedAt": "2026-11-11T11:13:04.468Z"
+  },
+  {
+    "_id": "audit_1794395394740_gwq02i",
+    "id": "audit_1794395394740_gwq02i",
+    "timestamp": "2026-11-11T11:09:54.740Z",
+    "action": "UPDATE",
+    "collectionName": "skills",
+    "targetId": "skill_1794395252086_r6olu",
+    "targetTitle": "javaptr ioj (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "name": "javaptr",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "level": "Advanced",
+        "icon": "fab fa-react",
+        "highlight": false,
+        "featured": false,
+        "id": "skill_1794395252086_r6olu",
+        "_id": "skill_1794395252086_r6olu",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:07:32.605Z",
+        "updatedAt": "2026-11-11T11:07:32.605Z",
+        "category": "DevOps & Developer Tools",
+        "proficiency": 85
+      },
+      "after": {
+        "name": "javaptr ioj",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "level": "Advanced",
+        "icon": "fab fa-react",
+        "highlight": false,
+        "featured": false,
+        "id": "skill_1794395252086_r6olu",
+        "_id": "skill_1794395252086_r6olu",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:07:32.605Z",
+        "updatedAt": "2026-11-11T11:09:54.739Z",
+        "category": "DevOps & Developer Tools",
+        "proficiency": 85
+      },
+      "modifiedFields": [
+        "name",
+        "domainId",
+        "domainTitle",
+        "level",
+        "icon",
+        "highlight",
+        "featured",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/skills/skill_1794395252086_r6olu"
+    },
+    "createdAt": "2026-11-11T11:09:54.740Z",
+    "updatedAt": "2026-11-11T11:09:54.740Z"
+  },
+  {
+    "_id": "audit_1794395372047_8al3qs",
+    "id": "audit_1794395372047_8al3qs",
+    "timestamp": "2026-11-11T11:09:32.047Z",
+    "action": "UPDATE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794395201757_5msbz",
+    "targetTitle": "infosys (IBM SkillsBuild / Coursera)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "title": "infosys",
+        "issuer": "IBM SkillsBuild / Coursera",
+        "date": "2025",
+        "category": "web",
+        "categoryLabel": "Web Development",
+        "credentialId": "SK-201748",
+        "skills": [],
+        "image": "/certificates/previews/ibm-web-dev.png",
+        "file": "/certificates/previews/ibm-web-dev.png",
+        "preview": "/certificates/previews/ibm-web-dev.png",
+        "link": "#",
+        "id": "cert_1794395201757_5msbz",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:42.261Z",
+        "updatedAt": "2026-11-11T11:06:42.262Z",
+        "_id": "cert_1794395201757_5msbz",
+        "verifyUrl": "#",
+        "credentialUrl": "#",
+        "featured": false
+      },
+      "after": {
+        "title": "infosys",
+        "issuer": "IBM SkillsBuild / Coursera",
+        "date": "2025",
+        "category": "web",
+        "categoryLabel": "Web Development",
+        "credentialId": "SK-201748",
+        "skills": [],
+        "image": "[Uploaded Media/PDF (171 KB)]",
+        "file": "[Uploaded Media/PDF (171 KB)]",
+        "preview": "[Uploaded Media/PDF (171 KB)]",
+        "link": "/certificates/previews/ibm-web-dev.png",
+        "id": "cert_1794395201757_5msbz",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:42.261Z",
+        "updatedAt": "2026-11-11T11:09:32.043Z",
+        "_id": "cert_1794395201757_5msbz",
+        "verifyUrl": "/certificates/previews/ibm-web-dev.png",
+        "credentialUrl": "/certificates/previews/ibm-web-dev.png",
+        "featured": false
+      },
+      "modifiedFields": [
+        "title",
+        "issuer",
+        "date",
+        "category",
+        "categoryLabel",
+        "credentialId",
+        "skills",
+        "image",
+        "file",
+        "preview",
+        "link",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/certifications/cert_1794395201757_5msbz"
+    },
+    "createdAt": "2026-11-11T11:09:32.047Z",
+    "updatedAt": "2026-11-11T11:09:32.047Z"
+  },
+  {
+    "_id": "audit_1794395351468_mhz6x4",
+    "id": "audit_1794395351468_mhz6x4",
+    "timestamp": "2026-11-11T11:09:11.468Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794395185946_2b9h7",
+    "targetTitle": "AI & Machine Learning Intern at tcs ion",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": {
+          "id": "cert_1794395220475",
+          "title": "AI & Machine Learning Intern - tcs Certificate",
+          "issuer": "tcs",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (171 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794395185946_2b9h7",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:26.493Z",
+        "updatedAt": "2026-11-11T11:07:01.737Z",
+        "_id": "exp_1794395185946_2b9h7",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "after": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs ion",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": {
+          "id": "cert_1794395220475",
+          "title": "AI & Machine Learning Intern - tcs Certificate",
+          "issuer": "tcs",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (171 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794395185946_2b9h7",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:26.493Z",
+        "updatedAt": "2026-11-11T11:09:11.466Z",
+        "_id": "exp_1794395185946_2b9h7",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "role",
+        "title",
+        "company",
+        "location",
+        "period",
+        "duration",
+        "category",
+        "categoryLabel",
+        "skills",
+        "tech",
+        "description",
+        "details",
+        "certificate",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/experience/exp_1794395185946_2b9h7"
+    },
+    "createdAt": "2026-11-11T11:09:11.468Z",
+    "updatedAt": "2026-11-11T11:09:11.468Z"
+  },
+  {
+    "_id": "audit_1794395252605_k88x9w",
+    "id": "audit_1794395252605_k88x9w",
+    "timestamp": "2026-11-11T11:07:32.605Z",
+    "action": "CREATE",
+    "collectionName": "skills",
+    "targetId": "skill_1794395252086_r6olu",
+    "targetTitle": "javaptr (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "name": "javaptr",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "level": "Advanced",
+        "icon": "fab fa-react",
+        "highlight": false,
+        "featured": false,
+        "id": "skill_1794395252086_r6olu",
+        "_id": "skill_1794395252086_r6olu",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:07:32.605Z",
+        "updatedAt": "2026-11-11T11:07:32.605Z",
+        "category": "DevOps & Developer Tools",
+        "proficiency": 85
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/skills"
+    },
+    "createdAt": "2026-11-11T11:07:32.605Z",
+    "updatedAt": "2026-11-11T11:07:32.605Z"
+  },
+  {
+    "_id": "audit_1794395221739_eezcld",
+    "id": "audit_1794395221739_eezcld",
+    "timestamp": "2026-11-11T11:07:01.739Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794395185946_2b9h7",
+    "targetTitle": "AI & Machine Learning Intern at tcs",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": null,
+        "id": "exp_1794395185946_2b9h7",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:26.493Z",
+        "updatedAt": "2026-11-11T11:06:26.493Z",
+        "_id": "exp_1794395185946_2b9h7",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "after": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": {
+          "id": "cert_1794395220475",
+          "title": "AI & Machine Learning Intern - tcs Certificate",
+          "issuer": "tcs",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (171 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794395185946_2b9h7",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:26.493Z",
+        "updatedAt": "2026-11-11T11:07:01.737Z",
+        "_id": "exp_1794395185946_2b9h7",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "role",
+        "title",
+        "company",
+        "location",
+        "period",
+        "duration",
+        "category",
+        "categoryLabel",
+        "skills",
+        "tech",
+        "description",
+        "details",
+        "certificate",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/experience/exp_1794395185946_2b9h7"
+    },
+    "createdAt": "2026-11-11T11:07:01.740Z",
+    "updatedAt": "2026-11-11T11:07:01.740Z"
+  },
+  {
+    "_id": "audit_1794395202262_1r0gug",
+    "id": "audit_1794395202262_1r0gug",
+    "timestamp": "2026-11-11T11:06:42.263Z",
+    "action": "CREATE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794395201757_5msbz",
+    "targetTitle": "infosys (IBM SkillsBuild / Coursera)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "title": "infosys",
+        "issuer": "IBM SkillsBuild / Coursera",
+        "date": "2025",
+        "category": "web",
+        "categoryLabel": "Web Development",
+        "credentialId": "SK-201748",
+        "skills": [],
+        "image": "/certificates/previews/ibm-web-dev.png",
+        "file": "/certificates/previews/ibm-web-dev.png",
+        "preview": "/certificates/previews/ibm-web-dev.png",
+        "link": "#",
+        "id": "cert_1794395201757_5msbz",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:42.261Z",
+        "updatedAt": "2026-11-11T11:06:42.262Z",
+        "_id": "cert_1794395201757_5msbz",
+        "verifyUrl": "#",
+        "credentialUrl": "#",
+        "featured": false
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/certifications"
+    },
+    "createdAt": "2026-11-11T11:06:42.263Z",
+    "updatedAt": "2026-11-11T11:06:42.263Z"
+  },
+  {
+    "_id": "audit_1794395186494_i3xgjd",
+    "id": "audit_1794395186494_i3xgjd",
+    "timestamp": "2026-11-11T11:06:26.494Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794395185946_2b9h7",
+    "targetTitle": "AI & Machine Learning Intern at tcs",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": null,
+        "id": "exp_1794395185946_2b9h7",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T11:06:26.493Z",
+        "updatedAt": "2026-11-11T11:06:26.493Z",
+        "_id": "exp_1794395185946_2b9h7",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-11T11:06:26.494Z",
+    "updatedAt": "2026-11-11T11:06:26.494Z"
+  },
+  {
+    "_id": "audit_1794394909215_9n5zty",
+    "id": "audit_1794394909215_9n5zty",
+    "timestamp": "2026-11-11T11:01:49.215Z",
+    "action": "DELETE",
+    "collectionName": "skills",
+    "targetId": "skill_tools-devops_2_linux___bash",
+    "targetTitle": "Linux / Bash (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "skill_tools-devops_2_linux___bash",
+        "id": "skill_tools-devops_2_linux___bash",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "name": "Linux / Bash",
+        "level": "Proficient",
+        "icon": "fab fa-linux",
+        "highlight": false,
+        "createdAt": "2026-11-10T12:46:44.130Z",
+        "updatedAt": "2026-11-10T12:46:44.130Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/skills/skill_tools-devops_2_linux___bash"
+    },
+    "createdAt": "2026-11-11T11:01:49.216Z",
+    "updatedAt": "2026-11-11T11:01:49.216Z"
+  },
+  {
+    "_id": "audit_1794394905019_lf92k9",
+    "id": "audit_1794394905019_lf92k9",
+    "timestamp": "2026-11-11T11:01:45.019Z",
+    "action": "DELETE",
+    "collectionName": "skills",
+    "targetId": "skill_tools-devops_3_docker_essentials",
+    "targetTitle": "Docker Essentials (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "skill_tools-devops_3_docker_essentials",
+        "id": "skill_tools-devops_3_docker_essentials",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "name": "Docker Essentials",
+        "level": "Proficient",
+        "icon": "fab fa-docker",
+        "highlight": false,
+        "createdAt": "2026-11-10T11:53:29.885Z",
+        "updatedAt": "2026-11-10T11:53:29.885Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/skills/skill_tools-devops_3_docker_essentials"
+    },
+    "createdAt": "2026-11-11T11:01:45.019Z",
+    "updatedAt": "2026-11-11T11:01:45.019Z"
+  },
+  {
+    "_id": "audit_1794394870751_0lnij6",
+    "id": "audit_1794394870751_0lnij6",
+    "timestamp": "2026-11-11T11:01:10.751Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794394707343_cmf68",
+    "targetTitle": "AI & Machine Learning Intern at Infosys",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "Infosys",
+        "location": "Remote",
+        "period": "2025",
+        "duration": "2025",
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [
+          "this is testing purpose."
+        ],
+        "details": [
+          "this is testing purpose."
+        ],
+        "certificate": {
+          "id": "cert_1794394707337",
+          "title": "AI & Machine Learning Intern - Infosys Certificate",
+          "issuer": "Infosys",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (4590 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794394707343_cmf68",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T10:58:52.585Z",
+        "updatedAt": "2026-11-11T11:00:14.749Z",
+        "_id": "exp_1794394707343_cmf68",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794394707343_cmf68"
+    },
+    "createdAt": "2026-11-11T11:01:10.751Z",
+    "updatedAt": "2026-11-11T11:01:10.751Z"
+  },
+  {
+    "_id": "audit_1794394814782_m7wxmq",
+    "id": "audit_1794394814782_m7wxmq",
+    "timestamp": "2026-11-11T11:00:14.782Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794394707343_cmf68",
+    "targetTitle": "AI & Machine Learning Intern at Infosys",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "Infosys",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [
+          "this is testing purpose.",
+          "so this is high expectation."
+        ],
+        "details": [
+          "this is testing purpose.",
+          "so this is high expectation."
+        ],
+        "certificate": {
+          "id": "cert_1794394707337",
+          "title": "AI & Machine Learning Intern - Infosys Certificate",
+          "issuer": "Infosys",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (4590 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794394707343_cmf68",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T10:58:52.585Z",
+        "updatedAt": "2026-11-11T10:58:52.585Z",
+        "_id": "exp_1794394707343_cmf68",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "after": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "Infosys",
+        "location": "Remote",
+        "period": "2025",
+        "duration": "2025",
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [
+          "this is testing purpose."
+        ],
+        "details": [
+          "this is testing purpose."
+        ],
+        "certificate": {
+          "id": "cert_1794394707337",
+          "title": "AI & Machine Learning Intern - Infosys Certificate",
+          "issuer": "Infosys",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (4590 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794394707343_cmf68",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T10:58:52.585Z",
+        "updatedAt": "2026-11-11T11:00:14.749Z",
+        "_id": "exp_1794394707343_cmf68",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "role",
+        "title",
+        "company",
+        "location",
+        "period",
+        "duration",
+        "category",
+        "categoryLabel",
+        "skills",
+        "tech",
+        "description",
+        "details",
+        "certificate",
+        "authorUid",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "PUT",
+      "endpoint": "/api/experience/exp_1794394707343_cmf68"
+    },
+    "createdAt": "2026-11-11T11:00:14.782Z",
+    "updatedAt": "2026-11-11T11:00:14.782Z"
+  },
+  {
+    "_id": "audit_1794394732616_y4tiew",
+    "id": "audit_1794394732616_y4tiew",
+    "timestamp": "2026-11-11T10:58:52.616Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794394707343_cmf68",
+    "targetTitle": "AI & Machine Learning Intern at Infosys",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "Infosys",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [
+          "this is testing purpose.",
+          "so this is high expectation."
+        ],
+        "details": [
+          "this is testing purpose.",
+          "so this is high expectation."
+        ],
+        "certificate": {
+          "id": "cert_1794394707337",
+          "title": "AI & Machine Learning Intern - Infosys Certificate",
+          "issuer": "Infosys",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (4590 KB)]",
+          "preview": "",
+          "image": ""
+        },
+        "id": "exp_1794394707343_cmf68",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T10:58:52.585Z",
+        "updatedAt": "2026-11-11T10:58:52.585Z",
+        "_id": "exp_1794394707343_cmf68",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-11T10:58:52.616Z",
+    "updatedAt": "2026-11-11T10:58:52.616Z"
+  },
+  {
+    "_id": "audit_1794394561064_p5x6ei",
+    "id": "audit_1794394561064_p5x6ei",
+    "timestamp": "2026-11-11T10:56:01.064Z",
+    "action": "DELETE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794329993576_pc3k9",
+    "targetTitle": "TCS AI Hackathon Certificate (TCS ION)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "cert_1794329993576_pc3k9",
+        "title": "TCS AI Hackathon Certificate",
+        "issuer": "TCS ION",
+        "date": "5th Nov 2026",
+        "category": "other",
+        "categoryLabel": "Other Courses",
+        "credentialId": "SK-993567",
+        "skills": [],
+        "image": "[Uploaded Media/PDF (4590 KB)]",
+        "file": "[Uploaded Media/PDF (4590 KB)]",
+        "preview": "[Uploaded Media/PDF (4590 KB)]",
+        "link": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "id": "cert_1794329993576_pc3k9",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-10T17:00:32.951Z",
+        "updatedAt": "2026-11-10T17:00:32.951Z",
+        "verifyUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "credentialUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/certifications/cert_1794329993576_pc3k9"
+    },
+    "createdAt": "2026-11-11T10:56:01.064Z",
+    "updatedAt": "2026-11-11T10:56:01.064Z"
+  },
+  {
+    "_id": "audit_1794392037145_ehl54u",
+    "id": "audit_1794392037145_ehl54u",
+    "timestamp": "2026-11-11T10:13:57.145Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "ms-sap-techsaksham",
+    "targetTitle": "AI Intern (Transformative Learning with TechSaksham) at Microsoft & SAP CSR Initiative collaboration with Edunet Foundation & AICTE",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "ms-sap-techsaksham",
+        "id": "ms-sap-techsaksham",
+        "role": "AI Intern (Transformative Learning with TechSaksham)",
+        "company": "Microsoft & SAP CSR Initiative collaboration with Edunet Foundation & AICTE",
+        "duration": "16th Jan 2025 - 15th Feb 2025",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "ms-sap-internship-cert",
+          "title": "Internship Completion Certificate (AI: Transformative Learning with TechSaksham)",
+          "issuer": "Microsoft & SAP CSR Initiative",
+          "date": "February 2025",
+          "file": "/certificates/microsoft-sap-internship.pdf",
+          "preview": "/certificates/previews/microsoft-sap-internship.png"
+        },
+        "details": [
+          "Built AI solutions under the joint CSR initiative of Microsoft and SAP.",
+          "Developed AI prototypes solving real-world educational technology challenges.",
+          "Collaborated directly with industry mentors from Microsoft and SAP."
+        ],
+        "tech": [
+          "Artificial Intelligence",
+          "Machine Learning",
+          "Python"
+        ],
+        "createdAt": "2026-11-10T11:53:33.925Z",
+        "updatedAt": "2026-11-10T11:53:33.925Z"
+      },
+      "after": {
+        "_id": "ms-sap-techsaksham",
+        "id": "ms-sap-techsaksham",
+        "role": "AI Intern (Transformative Learning with TechSaksham)",
+        "company": "Microsoft & SAP CSR Initiative collaboration with Edunet Foundation & AICTE",
+        "duration": "16th Jan 2025 - 15th Feb 2025",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "ms-sap-internship-cert",
+          "title": "Internship Completion Certificate (AI: Transformative Learning with TechSaksham)",
+          "issuer": "Microsoft & SAP CSR Initiative",
+          "date": "February 2025",
+          "file": "/certificates/microsoft-sap-internship.pdf",
+          "preview": "/certificates/previews/microsoft-sap-internship.png",
+          "image": "/certificates/microsoft-sap-internship.pdf"
+        },
+        "details": [
+          "Built AI solutions under the joint CSR initiative of Microsoft and SAP.",
+          "Developed AI prototypes solving real-world educational technology challenges.",
+          "Collaborated directly with industry mentors from Microsoft and SAP."
+        ],
+        "tech": [
+          "Artificial Intelligence",
+          "Machine Learning",
+          "Python"
+        ],
+        "createdAt": "2026-11-10T11:53:33.925Z",
+        "updatedAt": "2026-11-11T10:13:57.145Z",
+        "title": "AI Intern (Transformative Learning with TechSaksham)",
+        "location": "Remote",
+        "period": "16th Jan 2025 - 15th Feb 2025",
+        "type": "Internship",
+        "description": [
+          "Built AI solutions under the joint CSR initiative of Microsoft and SAP.",
+          "Developed AI prototypes solving real-world educational technology challenges.",
+          "Collaborated directly with industry mentors from Microsoft and SAP."
+        ],
+        "achievements": [],
+        "technologies": [
+          "Artificial Intelligence",
+          "Machine Learning",
+          "Python"
+        ],
+        "skills": [
+          "Artificial Intelligence",
+          "Machine Learning",
+          "Python"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "_id",
+        "id",
+        "role",
+        "company",
+        "duration",
+        "category",
+        "categoryLabel",
+        "certificate",
+        "details",
+        "tech",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/ms-sap-techsaksham"
+    },
+    "createdAt": "2026-11-11T10:13:57.146Z",
+    "updatedAt": "2026-11-11T10:13:57.146Z"
+  },
+  {
+    "_id": "audit_1794392036663_6fuy2x",
+    "id": "audit_1794392036663_6fuy2x",
+    "timestamp": "2026-11-11T10:13:56.663Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "ey-mern",
+    "targetTitle": "MERN Stack Intern at EY Global Delivery Services (in collaboration with AICTE & Edunet Foundation)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "ey-mern",
+        "id": "ey-mern",
+        "role": "MERN Stack Intern",
+        "company": "EY Global Delivery Services (in collaboration with AICTE & Edunet Foundation)",
+        "duration": "10th Feb 2025 - 21st March 2025",
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "certificate": {
+          "id": "ey-internship-cert",
+          "title": "Internship Completion Certificate (MERN Stack)",
+          "issuer": "EY Global Delivery Services & AICTE",
+          "date": "March 2025",
+          "file": "/certificates/Ey-gds-internship.pdf",
+          "preview": "/certificates/previews/Ey-gds-internship.png"
+        },
+        "details": [
+          "Completed intensive full-stack MERN engineering internship.",
+          "Developed full-stack web applications using MongoDB, Express, React, and Node.js.",
+          "Architected RESTful APIs and connected real-time MongoDB database schemas."
+        ],
+        "tech": [
+          "MongoDB",
+          "Express.js",
+          "React",
+          "Node.js",
+          "JavaScript"
+        ],
+        "createdAt": "2026-11-10T11:53:33.782Z",
+        "updatedAt": "2026-11-10T11:53:33.782Z"
+      },
+      "after": {
+        "_id": "ey-mern",
+        "id": "ey-mern",
+        "role": "MERN Stack Intern",
+        "company": "EY Global Delivery Services (in collaboration with AICTE & Edunet Foundation)",
+        "duration": "10th Feb 2025 - 21st March 2025",
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "certificate": {
+          "id": "ey-internship-cert",
+          "title": "Internship Completion Certificate (MERN Stack)",
+          "issuer": "EY Global Delivery Services & AICTE",
+          "date": "March 2025",
+          "file": "/certificates/Ey-gds-internship.pdf",
+          "preview": "/certificates/previews/Ey-gds-internship.png",
+          "image": "/certificates/Ey-gds-internship.pdf"
+        },
+        "details": [
+          "Completed intensive full-stack MERN engineering internship.",
+          "Developed full-stack web applications using MongoDB, Express, React, and Node.js.",
+          "Architected RESTful APIs and connected real-time MongoDB database schemas."
+        ],
+        "tech": [
+          "MongoDB",
+          "Express.js",
+          "React",
+          "Node.js",
+          "JavaScript"
+        ],
+        "createdAt": "2026-11-10T11:53:33.782Z",
+        "updatedAt": "2026-11-11T10:13:56.663Z",
+        "title": "MERN Stack Intern",
+        "location": "Remote",
+        "period": "10th Feb 2025 - 21st March 2025",
+        "type": "Internship",
+        "description": [
+          "Completed intensive full-stack MERN engineering internship.",
+          "Developed full-stack web applications using MongoDB, Express, React, and Node.js.",
+          "Architected RESTful APIs and connected real-time MongoDB database schemas."
+        ],
+        "achievements": [],
+        "technologies": [
+          "MongoDB",
+          "Express.js",
+          "React",
+          "Node.js",
+          "JavaScript"
+        ],
+        "skills": [
+          "MongoDB",
+          "Express.js",
+          "React",
+          "Node.js",
+          "JavaScript"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "_id",
+        "id",
+        "role",
+        "company",
+        "duration",
+        "category",
+        "categoryLabel",
+        "certificate",
+        "details",
+        "tech",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/ey-mern"
+    },
+    "createdAt": "2026-11-11T10:13:56.663Z",
+    "updatedAt": "2026-11-11T10:13:56.663Z"
+  },
+  {
+    "_id": "audit_1794392036170_vaqbdp",
+    "id": "audit_1794392036170_vaqbdp",
+    "timestamp": "2026-11-11T10:13:56.170Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "ms-ai-foundations",
+    "targetTitle": "AI Intern - Foundations of Artificial Intelligence at Microsoft collaboration with Edunet Foundation & AICTE",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "ms-ai-foundations",
+        "id": "ms-ai-foundations",
+        "role": "AI Intern - Foundations of Artificial Intelligence",
+        "company": "Microsoft collaboration with Edunet Foundation & AICTE",
+        "duration": "10th April 2025 - 10th May 2025",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "ms-ai-internship-cert",
+          "title": "Internship Completion Certificate (Foundation of AI)",
+          "issuer": "Microsoft & Edunet Foundation (AICTE)",
+          "date": "May 2025",
+          "file": "/certificates/microsoft-ai-internship.pdf",
+          "preview": "/certificates/previews/microsoft-ai-internship.png"
+        },
+        "details": [
+          "Focused on core foundations of artificial intelligence and optimization methods.",
+          "Studied foundational supervised and unsupervised machine learning algorithms.",
+          "Implemented neural network prototypes and problem-solving workflows."
+        ],
+        "tech": [
+          "AI Fundamentals",
+          "Machine Learning",
+          "Algorithms"
+        ],
+        "createdAt": "2026-11-10T11:53:33.639Z",
+        "updatedAt": "2026-11-10T11:53:33.639Z"
+      },
+      "after": {
+        "_id": "ms-ai-foundations",
+        "id": "ms-ai-foundations",
+        "role": "AI Intern - Foundations of Artificial Intelligence",
+        "company": "Microsoft collaboration with Edunet Foundation & AICTE",
+        "duration": "10th April 2025 - 10th May 2025",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "ms-ai-internship-cert",
+          "title": "Internship Completion Certificate (Foundation of AI)",
+          "issuer": "Microsoft & Edunet Foundation (AICTE)",
+          "date": "May 2025",
+          "file": "/certificates/microsoft-ai-internship.pdf",
+          "preview": "/certificates/previews/microsoft-ai-internship.png",
+          "image": "/certificates/microsoft-ai-internship.pdf"
+        },
+        "details": [
+          "Focused on core foundations of artificial intelligence and optimization methods.",
+          "Studied foundational supervised and unsupervised machine learning algorithms.",
+          "Implemented neural network prototypes and problem-solving workflows."
+        ],
+        "tech": [
+          "AI Fundamentals",
+          "Machine Learning",
+          "Algorithms"
+        ],
+        "createdAt": "2026-11-10T11:53:33.639Z",
+        "updatedAt": "2026-11-11T10:13:56.170Z",
+        "title": "AI Intern - Foundations of Artificial Intelligence",
+        "location": "Remote",
+        "period": "10th April 2025 - 10th May 2025",
+        "type": "Internship",
+        "description": [
+          "Focused on core foundations of artificial intelligence and optimization methods.",
+          "Studied foundational supervised and unsupervised machine learning algorithms.",
+          "Implemented neural network prototypes and problem-solving workflows."
+        ],
+        "achievements": [],
+        "technologies": [
+          "AI Fundamentals",
+          "Machine Learning",
+          "Algorithms"
+        ],
+        "skills": [
+          "AI Fundamentals",
+          "Machine Learning",
+          "Algorithms"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "_id",
+        "id",
+        "role",
+        "company",
+        "duration",
+        "category",
+        "categoryLabel",
+        "certificate",
+        "details",
+        "tech",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/ms-ai-foundations"
+    },
+    "createdAt": "2026-11-11T10:13:56.170Z",
+    "updatedAt": "2026-11-11T10:13:56.170Z"
+  },
+  {
+    "_id": "audit_1794392035695_4lvmqe",
+    "id": "audit_1794392035695_4lvmqe",
+    "timestamp": "2026-11-11T10:13:55.695Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "ibm-aiml",
+    "targetTitle": "AI & Machine Learning Intern at IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "ibm-aiml",
+        "id": "ibm-aiml",
+        "role": "AI & Machine Learning Intern",
+        "company": "IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+        "duration": "18th June 2025 - 30th July 2025",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "ibm-aiml-internship-cert",
+          "title": "Internship Completion Certificate (AI & ML)",
+          "issuer": "IBM SkillsBuild & Edunet Foundation (AICTE)",
+          "date": "July 2025",
+          "file": "/certificates/ibm-aiml-internship.pdf",
+          "preview": "/certificates/previews/ibm-aiml-internship.png"
+        },
+        "details": [
+          "Specialized in artificial intelligence, machine learning, and data preprocessing.",
+          "Implemented ML models for predictive data analysis and evaluation.",
+          "Engineered end-to-end data pipelines for structured datasets."
+        ],
+        "tech": [
+          "AI/ML",
+          "Data Science",
+          "Python",
+          "TensorFlow"
+        ],
+        "createdAt": "2026-11-10T11:53:33.492Z",
+        "updatedAt": "2026-11-10T11:53:33.492Z"
+      },
+      "after": {
+        "_id": "ibm-aiml",
+        "id": "ibm-aiml",
+        "role": "AI & Machine Learning Intern",
+        "company": "IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+        "duration": "18th June 2025 - 30th July 2025",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "ibm-aiml-internship-cert",
+          "title": "Internship Completion Certificate (AI & ML)",
+          "issuer": "IBM SkillsBuild & Edunet Foundation (AICTE)",
+          "date": "July 2025",
+          "file": "/certificates/ibm-aiml-internship.pdf",
+          "preview": "/certificates/previews/ibm-aiml-internship.png",
+          "image": "/certificates/ibm-aiml-internship.pdf"
+        },
+        "details": [
+          "Specialized in artificial intelligence, machine learning, and data preprocessing.",
+          "Implemented ML models for predictive data analysis and evaluation.",
+          "Engineered end-to-end data pipelines for structured datasets."
+        ],
+        "tech": [
+          "AI/ML",
+          "Data Science",
+          "Python",
+          "TensorFlow"
+        ],
+        "createdAt": "2026-11-10T11:53:33.492Z",
+        "updatedAt": "2026-11-11T10:13:55.695Z",
+        "title": "AI & Machine Learning Intern",
+        "location": "Remote",
+        "period": "18th June 2025 - 30th July 2025",
+        "type": "Internship",
+        "description": [
+          "Specialized in artificial intelligence, machine learning, and data preprocessing.",
+          "Implemented ML models for predictive data analysis and evaluation.",
+          "Engineered end-to-end data pipelines for structured datasets."
+        ],
+        "achievements": [],
+        "technologies": [
+          "AI/ML",
+          "Data Science",
+          "Python",
+          "TensorFlow"
+        ],
+        "skills": [
+          "AI/ML",
+          "Data Science",
+          "Python",
+          "TensorFlow"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "_id",
+        "id",
+        "role",
+        "company",
+        "duration",
+        "category",
+        "categoryLabel",
+        "certificate",
+        "details",
+        "tech",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/ibm-aiml"
+    },
+    "createdAt": "2026-11-11T10:13:55.695Z",
+    "updatedAt": "2026-11-11T10:13:55.695Z"
+  },
+  {
+    "_id": "audit_1794392035172_ymv993",
+    "id": "audit_1794392035172_ymv993",
+    "timestamp": "2026-11-11T10:13:55.172Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "ibm-fwd",
+    "targetTitle": "Front-End Web Development Intern at IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "ibm-fwd",
+        "id": "ibm-fwd",
+        "role": "Front-End Web Development Intern",
+        "company": "IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+        "duration": "21st Aug 2025 - 2nd Oct 2025",
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "certificate": {
+          "id": "ibm-fwd-internship-cert",
+          "title": "Internship Completion Certificate (Front-End Development)",
+          "issuer": "IBM SkillsBuild & Edunet Foundation (AICTE)",
+          "date": "September 2025",
+          "file": "/certificates/ibm-fwd-internship.pdf",
+          "preview": "/certificates/previews/ibm-fwd-internship.png"
+        },
+        "details": [
+          "Developed responsive and interactive web interfaces with modern CSS & JavaScript.",
+          "Created user-friendly designs and components adhering to accessibility guidelines.",
+          "Built portfolio projects showcasing scalable frontend architecture."
+        ],
+        "tech": [
+          "HTML5",
+          "CSS3",
+          "JavaScript",
+          "Responsive Design"
+        ],
+        "createdAt": "2026-11-10T11:53:33.350Z",
+        "updatedAt": "2026-11-10T11:53:33.350Z"
+      },
+      "after": {
+        "_id": "ibm-fwd",
+        "id": "ibm-fwd",
+        "role": "Front-End Web Development Intern",
+        "company": "IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+        "duration": "21st Aug 2025 - 2nd Oct 2025",
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "certificate": {
+          "id": "ibm-fwd-internship-cert",
+          "title": "Internship Completion Certificate (Front-End Development)",
+          "issuer": "IBM SkillsBuild & Edunet Foundation (AICTE)",
+          "date": "September 2025",
+          "file": "/certificates/ibm-fwd-internship.pdf",
+          "preview": "/certificates/previews/ibm-fwd-internship.png",
+          "image": "/certificates/ibm-fwd-internship.pdf"
+        },
+        "details": [
+          "Developed responsive and interactive web interfaces with modern CSS & JavaScript.",
+          "Created user-friendly designs and components adhering to accessibility guidelines.",
+          "Built portfolio projects showcasing scalable frontend architecture."
+        ],
+        "tech": [
+          "HTML5",
+          "CSS3",
+          "JavaScript",
+          "Responsive Design"
+        ],
+        "createdAt": "2026-11-10T11:53:33.350Z",
+        "updatedAt": "2026-11-11T10:13:55.172Z",
+        "title": "Front-End Web Development Intern",
+        "location": "Remote",
+        "period": "21st Aug 2025 - 2nd Oct 2025",
+        "type": "Internship",
+        "description": [
+          "Developed responsive and interactive web interfaces with modern CSS & JavaScript.",
+          "Created user-friendly designs and components adhering to accessibility guidelines.",
+          "Built portfolio projects showcasing scalable frontend architecture."
+        ],
+        "achievements": [],
+        "technologies": [
+          "HTML5",
+          "CSS3",
+          "JavaScript",
+          "Responsive Design"
+        ],
+        "skills": [
+          "HTML5",
+          "CSS3",
+          "JavaScript",
+          "Responsive Design"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "_id",
+        "id",
+        "role",
+        "company",
+        "duration",
+        "category",
+        "categoryLabel",
+        "certificate",
+        "details",
+        "tech",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/ibm-fwd"
+    },
+    "createdAt": "2026-11-11T10:13:55.172Z",
+    "updatedAt": "2026-11-11T10:13:55.172Z"
+  },
+  {
+    "_id": "audit_1794392034684_j0pcud",
+    "id": "audit_1794392034684_j0pcud",
+    "timestamp": "2026-11-11T10:13:54.684Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "infosys-ai-6",
+    "targetTitle": "AI Intern - Infosys Springboard Virtual Internship 6.0 at Infosys Springboard",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "infosys-ai-6",
+        "id": "infosys-ai-6",
+        "role": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+        "company": "Infosys Springboard",
+        "duration": "5th Nov 2025 - 10th Jan 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "infosys-internship-cert",
+          "title": "Infosys Springboard Virtual Internship 6.0 Completion Certificate",
+          "issuer": "Infosys",
+          "date": "March 2026",
+          "file": "/certificates/Infosys Sprinboard Internship certificate.pdf",
+          "preview": "/certificates/previews/Infosys Sprinboard Internship certificate.png",
+          "image": "/certificates/Infosys Sprinboard Internship certificate.pdf"
+        },
+        "details": [
+          "Understanding core principles and methodologies of AI and Machine Learning.",
+          "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+          "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+        ],
+        "tech": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "createdAt": "2026-11-10T11:53:33.197Z",
+        "updatedAt": "2026-11-11T10:11:14.879Z",
+        "location": "Remote",
+        "title": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+        "period": "5th Nov 2025 - 10th Jan 2026",
+        "type": "Internship",
+        "description": [
+          "Understanding core principles and methodologies of AI and Machine Learning.",
+          "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+          "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+        ],
+        "achievements": [],
+        "technologies": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "skills": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "featured": false
+      },
+      "after": {
+        "_id": "infosys-ai-6",
+        "id": "infosys-ai-6",
+        "role": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+        "company": "Infosys Springboard",
+        "duration": "5th Nov 2025 - 10th Jan 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "infosys-internship-cert",
+          "title": "Infosys Springboard Virtual Internship 6.0 Completion Certificate",
+          "issuer": "Infosys",
+          "date": "March 2026",
+          "file": "/certificates/Infosys Sprinboard Internship certificate.pdf",
+          "preview": "/certificates/previews/Infosys Sprinboard Internship certificate.png",
+          "image": "/certificates/Infosys Sprinboard Internship certificate.pdf"
+        },
+        "details": [
+          "Understanding core principles and methodologies of AI and Machine Learning.",
+          "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+          "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+        ],
+        "tech": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "createdAt": "2026-11-10T11:53:33.197Z",
+        "updatedAt": "2026-11-11T10:13:54.683Z",
+        "location": "Remote",
+        "title": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+        "period": "5th Nov 2025 - 10th Jan 2026",
+        "type": "Internship",
+        "description": [
+          "Understanding core principles and methodologies of AI and Machine Learning.",
+          "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+          "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+        ],
+        "achievements": [],
+        "technologies": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "skills": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "_id",
+        "id",
+        "role",
+        "company",
+        "duration",
+        "category",
+        "categoryLabel",
+        "certificate",
+        "details",
+        "tech",
+        "createdAt",
+        "updatedAt",
+        "location",
+        "title",
+        "period",
+        "type",
+        "description",
+        "achievements",
+        "technologies",
+        "skills",
+        "featured"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/infosys-ai-6"
+    },
+    "createdAt": "2026-11-11T10:13:54.684Z",
+    "updatedAt": "2026-11-11T10:13:54.684Z"
+  },
+  {
+    "_id": "audit_1794391874880_5mx3x7",
+    "id": "audit_1794391874880_5mx3x7",
+    "timestamp": "2026-11-11T10:11:14.880Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "infosys-ai-6",
+    "targetTitle": "AI Intern - Infosys Springboard Virtual Internship 6.0 at Infosys Springboard",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "infosys-ai-6",
+        "id": "infosys-ai-6",
+        "role": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+        "company": "Infosys Springboard",
+        "duration": "5th Nov 2025 - 10th Jan 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "infosys-internship-cert",
+          "title": "Infosys Springboard Virtual Internship 6.0 Completion Certificate",
+          "issuer": "Infosys",
+          "date": "March 2026",
+          "file": "/certificates/Infosys Sprinboard Internship certificate.pdf",
+          "preview": "/certificates/previews/Infosys Sprinboard Internship certificate.png"
+        },
+        "details": [
+          "Understanding core principles and methodologies of AI and Machine Learning.",
+          "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+          "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+        ],
+        "tech": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "createdAt": "2026-11-10T11:53:33.197Z",
+        "updatedAt": "2026-11-10T11:53:33.197Z"
+      },
+      "after": {
+        "_id": "infosys-ai-6",
+        "id": "infosys-ai-6",
+        "role": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+        "company": "Infosys Springboard",
+        "duration": "5th Nov 2025 - 10th Jan 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "certificate": {
+          "id": "infosys-internship-cert",
+          "title": "Infosys Springboard Virtual Internship 6.0 Completion Certificate",
+          "issuer": "Infosys",
+          "date": "March 2026",
+          "file": "/certificates/Infosys Sprinboard Internship certificate.pdf",
+          "preview": "/certificates/previews/Infosys Sprinboard Internship certificate.png",
+          "image": "/certificates/Infosys Sprinboard Internship certificate.pdf"
+        },
+        "details": [
+          "Understanding core principles and methodologies of AI and Machine Learning.",
+          "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+          "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+        ],
+        "tech": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "createdAt": "2026-11-10T11:53:33.197Z",
+        "updatedAt": "2026-11-11T10:11:14.879Z",
+        "location": "Remote",
+        "title": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+        "period": "5th Nov 2025 - 10th Jan 2026",
+        "type": "Internship",
+        "description": [
+          "Understanding core principles and methodologies of AI and Machine Learning.",
+          "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+          "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+        ],
+        "achievements": [],
+        "technologies": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "skills": [
+          "Deep Learning",
+          "Machine Learning",
+          "Python",
+          "NumPy",
+          "Flask",
+          "OpenCV"
+        ],
+        "featured": false
+      },
+      "modifiedFields": [
+        "_id",
+        "id",
+        "role",
+        "company",
+        "duration",
+        "category",
+        "categoryLabel",
+        "certificate",
+        "details",
+        "tech",
+        "createdAt",
+        "updatedAt",
+        "location"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/infosys-ai-6"
+    },
+    "createdAt": "2026-11-11T10:11:14.880Z",
+    "updatedAt": "2026-11-11T10:11:14.880Z"
+  },
+  {
+    "_id": "audit_1794391623394_yvqhyf",
+    "id": "audit_1794391623394_yvqhyf",
+    "timestamp": "2026-11-11T10:07:03.394Z",
+    "action": "DELETE",
+    "collectionName": "skills",
+    "targetId": "skill_tools-devops_2_linux___bash",
+    "targetTitle": "Linux / Bash (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "skill_tools-devops_2_linux___bash",
+        "id": "skill_tools-devops_2_linux___bash",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "name": "Linux / Bash",
+        "level": "Proficient",
+        "icon": "fab fa-linux",
+        "highlight": false,
+        "createdAt": "2026-11-10T11:53:29.885Z",
+        "updatedAt": "2026-11-10T11:53:29.885Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/skills/skill_tools-devops_2_linux___bash"
+    },
+    "createdAt": "2026-11-11T10:07:03.394Z",
+    "updatedAt": "2026-11-11T10:07:03.394Z"
+  },
+  {
+    "_id": "audit_1794391568648_rnstde",
+    "id": "audit_1794391568648_rnstde",
+    "timestamp": "2026-11-11T10:06:08.648Z",
+    "action": "DELETE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794329993576_pc3k9",
+    "targetTitle": "TCS AI Hackathon Certificate (TCS ION)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "cert_1794329993576_pc3k9",
+        "title": "TCS AI Hackathon Certificate",
+        "issuer": "TCS ION",
+        "date": "5th Nov 2026",
+        "category": "other",
+        "categoryLabel": "Other Courses",
+        "credentialId": "SK-993567",
+        "skills": [],
+        "image": "[Uploaded Media/PDF (4590 KB)]",
+        "file": "[Uploaded Media/PDF (4590 KB)]",
+        "preview": "[Uploaded Media/PDF (4590 KB)]",
+        "link": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "id": "cert_1794329993576_pc3k9",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-10T17:00:32.951Z",
+        "updatedAt": "2026-11-10T17:00:32.951Z",
+        "verifyUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "credentialUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/certifications/cert_1794329993576_pc3k9"
+    },
+    "createdAt": "2026-11-11T10:06:08.648Z",
+    "updatedAt": "2026-11-11T10:06:08.648Z"
+  },
+  {
+    "_id": "audit_1794391546360_sa2c9k",
+    "id": "audit_1794391546360_sa2c9k",
+    "timestamp": "2026-11-11T10:05:46.360Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794390467381_h56x6",
+    "targetTitle": "AI & Machine Learning Intern at Infosys",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "Infosys",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": {
+          "id": "cert_1794390467373",
+          "title": "AI & Machine Learning Intern - Infosys Certificate",
+          "issuer": "Infosys",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (171 KB)]",
+          "preview": "[Uploaded Media/PDF (171 KB)]",
+          "image": "[Uploaded Media/PDF (171 KB)]"
+        },
+        "id": "exp_1794390467381_h56x6",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T09:47:48.717Z",
+        "updatedAt": "2026-11-11T09:47:48.717Z",
+        "_id": "exp_1794390467381_h56x6",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794390467381_h56x6"
+    },
+    "createdAt": "2026-11-11T10:05:46.360Z",
+    "updatedAt": "2026-11-11T10:05:46.360Z"
+  },
+  {
+    "_id": "audit_1794390468722_d4ny6v",
+    "id": "audit_1794390468722_d4ny6v",
+    "timestamp": "2026-11-11T09:47:48.722Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794390467381_h56x6",
+    "targetTitle": "AI & Machine Learning Intern at Infosys",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "Infosys",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": {
+          "id": "cert_1794390467373",
+          "title": "AI & Machine Learning Intern - Infosys Certificate",
+          "issuer": "Infosys",
+          "date": "2025 - 2026",
+          "file": "[Uploaded Media/PDF (171 KB)]",
+          "preview": "[Uploaded Media/PDF (171 KB)]",
+          "image": "[Uploaded Media/PDF (171 KB)]"
+        },
+        "id": "exp_1794390467381_h56x6",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T09:47:48.717Z",
+        "updatedAt": "2026-11-11T09:47:48.717Z",
+        "_id": "exp_1794390467381_h56x6",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-11T09:47:48.722Z",
+    "updatedAt": "2026-11-11T09:47:48.722Z"
+  },
+  {
+    "_id": "audit_1794389928643_9ze4fq",
+    "id": "audit_1794389928643_9ze4fq",
+    "timestamp": "2026-11-11T09:38:48.643Z",
+    "action": "DELETE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794388588073_6xd7w",
+    "targetTitle": "Fast Speed Test Certificate (ISRO / Coursera)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "cert_1794388588073_6xd7w",
+        "title": "Fast Speed Test Certificate",
+        "issuer": "ISRO / Coursera",
+        "date": "2026",
+        "category": "isro",
+        "categoryLabel": "ISRO",
+        "credentialId": "ISRO-FAST-2026",
+        "skills": [
+          "AI",
+          "Remote Sensing"
+        ],
+        "file": "[Uploaded Media/PDF (293 KB)]",
+        "image": "[Uploaded Media/PDF (293 KB)]",
+        "preview": "[Uploaded Media/PDF (293 KB)]",
+        "link": "[Uploaded Media/PDF (293 KB)]",
+        "credentialUrl": "[Uploaded Media/PDF (293 KB)]",
+        "verifyUrl": "[Uploaded Media/PDF (293 KB)]",
+        "featured": false,
+        "id": "cert_1794388588073_6xd7w",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T09:16:28.073Z",
+        "updatedAt": "2026-11-11T09:16:28.073Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "DELETE",
+      "endpoint": "/api/certifications/cert_1794388588073_6xd7w"
+    },
+    "createdAt": "2026-11-11T09:38:48.644Z",
+    "updatedAt": "2026-11-11T09:38:48.644Z"
+  },
+  {
+    "_id": "audit_1794388588705_goy5me",
+    "id": "audit_1794388588705_goy5me",
+    "timestamp": "2026-11-11T09:16:28.705Z",
+    "action": "DELETE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794388588073_6xd7w",
+    "targetTitle": "Fast Speed Test Certificate (ISRO / Coursera)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "title": "Fast Speed Test Certificate",
+        "issuer": "ISRO / Coursera",
+        "date": "2026",
+        "category": "isro",
+        "categoryLabel": "ISRO",
+        "credentialId": "ISRO-FAST-2026",
+        "skills": [
+          "AI",
+          "Remote Sensing"
+        ],
+        "file": "[Uploaded Media/PDF (293 KB)]",
+        "image": "[Uploaded Media/PDF (293 KB)]",
+        "preview": "[Uploaded Media/PDF (293 KB)]",
+        "link": "[Uploaded Media/PDF (293 KB)]",
+        "credentialUrl": "[Uploaded Media/PDF (293 KB)]",
+        "verifyUrl": "[Uploaded Media/PDF (293 KB)]",
+        "featured": false,
+        "id": "cert_1794388588073_6xd7w",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T09:16:28.073Z",
+        "updatedAt": "2026-11-11T09:16:28.073Z",
+        "_id": "cert_1794388588073_6xd7w"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "DELETE",
+      "endpoint": "/api/certifications/cert_1794388588073_6xd7w"
+    },
+    "createdAt": "2026-11-11T09:16:28.705Z",
+    "updatedAt": "2026-11-11T09:16:28.705Z"
+  },
+  {
+    "_id": "audit_1794388588171_q77b5j",
+    "id": "audit_1794388588171_q77b5j",
+    "timestamp": "2026-11-11T09:16:28.171Z",
+    "action": "CREATE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794388588073_6xd7w",
+    "targetTitle": "Fast Speed Test Certificate (ISRO / Coursera)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "title": "Fast Speed Test Certificate",
+        "issuer": "ISRO / Coursera",
+        "date": "2026",
+        "category": "isro",
+        "categoryLabel": "ISRO",
+        "credentialId": "ISRO-FAST-2026",
+        "skills": [
+          "AI",
+          "Remote Sensing"
+        ],
+        "file": "[Uploaded Media/PDF (293 KB)]",
+        "image": "[Uploaded Media/PDF (293 KB)]",
+        "preview": "[Uploaded Media/PDF (293 KB)]",
+        "link": "[Uploaded Media/PDF (293 KB)]",
+        "credentialUrl": "[Uploaded Media/PDF (293 KB)]",
+        "verifyUrl": "[Uploaded Media/PDF (293 KB)]",
+        "featured": false,
+        "id": "cert_1794388588073_6xd7w",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T09:16:28.073Z",
+        "updatedAt": "2026-11-11T09:16:28.073Z",
+        "_id": "cert_1794388588073_6xd7w"
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "POST",
+      "endpoint": "/api/certifications"
+    },
+    "createdAt": "2026-11-11T09:16:28.172Z",
+    "updatedAt": "2026-11-11T09:16:28.172Z"
+  },
+  {
+    "_id": "audit_1794330035048_597371",
+    "id": "audit_1794330035048_597371",
+    "timestamp": "2026-11-10T17:00:35.048Z",
+    "action": "CREATE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794329993576_pc3k9",
+    "targetTitle": "TCS AI Hackathon Certificate (TCS ION)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "title": "TCS AI Hackathon Certificate",
+        "issuer": "TCS ION",
+        "date": "5th Nov 2026",
+        "category": "other",
+        "categoryLabel": "Other Courses",
+        "credentialId": "SK-993567",
+        "skills": [],
+        "image": "[Uploaded Media/PDF (4590 KB)]",
+        "file": "[Uploaded Media/PDF (4590 KB)]",
+        "preview": "[Uploaded Media/PDF (4590 KB)]",
+        "link": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "id": "cert_1794329993576_pc3k9",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-10T17:00:32.951Z",
+        "updatedAt": "2026-11-10T17:00:32.951Z",
+        "_id": "cert_1794329993576_pc3k9",
+        "verifyUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "credentialUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "featured": false
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/certifications"
+    },
+    "createdAt": "2026-11-10T17:00:35.048Z",
+    "updatedAt": "2026-11-10T17:00:35.048Z"
+  },
+  {
+    "_id": "audit_1794327198735_bartad",
+    "id": "audit_1794327198735_bartad",
+    "timestamp": "2026-11-10T16:13:18.735Z",
+    "action": "DELETE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794321321345_x4y3r",
+    "targetTitle": "TCS AI Hackathon Certificate (TCS ION)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "cert_1794321321345_x4y3r",
+        "title": "TCS AI Hackathon Certificate",
+        "issuer": "TCS ION",
+        "date": "5th Nov 2026",
+        "category": "other",
+        "categoryLabel": "Other Courses",
+        "credentialId": "26051116625",
+        "skills": [
+          "AI",
+          "Problem Solving"
+        ],
+        "image": "[Uploaded Media/PDF (4590 KB)]",
+        "file": "[Uploaded Media/PDF (4590 KB)]",
+        "preview": "[Uploaded Media/PDF (4590 KB)]",
+        "link": "[Uploaded Media/PDF (382 KB)]",
+        "id": "cert_1794321321345_x4y3r",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-10T14:35:35.379Z",
+        "updatedAt": "2026-11-10T15:03:38.429Z",
+        "verifyUrl": "[Uploaded Media/PDF (382 KB)]"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/certifications/cert_1794321321345_x4y3r"
+    },
+    "createdAt": "2026-11-10T16:13:18.736Z",
+    "updatedAt": "2026-11-10T16:13:18.736Z"
+  },
+  {
+    "_id": "audit_1794312972847_hgvplj",
+    "id": "audit_1794312972847_hgvplj",
+    "timestamp": "2026-11-10T12:16:12.847Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794312971825_ifn2d",
+    "targetTitle": "Updated AI Intern at Test Labs",
+    "changedBy": {
+      "username": "master_admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Master Admin",
+      "role": "admin",
+      "userId": "master_admin"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794312971825_ifn2d",
+        "role": "Updated AI Intern",
+        "company": "Test Labs",
+        "location": "Remote",
+        "period": "2026",
+        "category": "ai",
+        "skills": [
+          "Python",
+          "TensorFlow"
+        ],
+        "description": [
+          "Built neural nets"
+        ],
+        "title": "Updated AI Intern",
+        "duration": "2026",
+        "type": "Internship",
+        "details": [
+          "Built neural nets"
+        ],
+        "tech": [
+          "Python",
+          "TensorFlow"
+        ],
+        "id": "exp_1794312971825_ifn2d",
+        "authorUid": "master_admin",
+        "createdAt": "2026-11-10T12:16:11.825Z",
+        "updatedAt": "2026-11-10T12:16:12.271Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794312971825_ifn2d"
+    },
+    "createdAt": "2026-11-10T12:16:12.847Z",
+    "updatedAt": "2026-11-10T12:16:12.847Z"
+  },
+  {
+    "_id": "audit_1794312972411_e5vj5l",
+    "id": "audit_1794312972411_e5vj5l",
+    "timestamp": "2026-11-10T12:16:12.411Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794312971825_ifn2d",
+    "targetTitle": "Updated AI Intern at Test Labs",
+    "changedBy": {
+      "username": "master_admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Master Admin",
+      "role": "admin",
+      "userId": "master_admin"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794312971825_ifn2d",
+        "role": "Test AI Intern",
+        "company": "Test Labs",
+        "location": "Remote",
+        "period": "2026",
+        "category": "ai",
+        "skills": [
+          "Python",
+          "PyTorch"
+        ],
+        "description": [
+          "Built neural nets"
+        ],
+        "title": "Test AI Intern",
+        "duration": "2026",
+        "type": "Internship",
+        "details": [
+          "Built neural nets"
+        ],
+        "tech": [
+          "Python",
+          "PyTorch"
+        ],
+        "id": "exp_1794312971825_ifn2d",
+        "authorUid": "master_admin",
+        "createdAt": "2026-11-10T12:16:11.825Z",
+        "updatedAt": "2026-11-10T12:16:11.825Z"
+      },
+      "after": {
+        "role": "Updated AI Intern",
+        "company": "Test Labs",
+        "location": "Remote",
+        "period": "2026",
+        "category": "ai",
+        "skills": [
+          "Python",
+          "TensorFlow"
+        ],
+        "description": [
+          "Built neural nets"
+        ],
+        "title": "Updated AI Intern",
+        "duration": "2026",
+        "type": "Internship",
+        "details": [
+          "Built neural nets"
+        ],
+        "tech": [
+          "Python",
+          "TensorFlow"
+        ],
+        "id": "exp_1794312971825_ifn2d",
+        "authorUid": "master_admin",
+        "createdAt": "2026-11-10T12:16:11.825Z",
+        "updatedAt": "2026-11-10T12:16:12.271Z",
+        "_id": "exp_1794312971825_ifn2d"
+      },
+      "modifiedFields": [
+        "role",
+        "skills"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/exp_1794312971825_ifn2d"
+    },
+    "createdAt": "2026-11-10T12:16:12.411Z",
+    "updatedAt": "2026-11-10T12:16:12.411Z"
+  },
+  {
+    "_id": "audit_1794312971980_mpee6z",
+    "id": "audit_1794312971980_mpee6z",
+    "timestamp": "2026-11-10T12:16:11.980Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794312971825_ifn2d",
+    "targetTitle": "Test AI Intern at Test Labs",
+    "changedBy": {
+      "username": "master_admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Master Admin",
+      "role": "admin",
+      "userId": "master_admin"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "Test AI Intern",
+        "company": "Test Labs",
+        "location": "Remote",
+        "period": "2026",
+        "category": "ai",
+        "skills": [
+          "Python",
+          "PyTorch"
+        ],
+        "description": [
+          "Built neural nets"
+        ],
+        "title": "Test AI Intern",
+        "duration": "2026",
+        "type": "Internship",
+        "details": [
+          "Built neural nets"
+        ],
+        "tech": [
+          "Python",
+          "PyTorch"
+        ],
+        "id": "exp_1794312971825_ifn2d",
+        "authorUid": "master_admin",
+        "createdAt": "2026-11-10T12:16:11.825Z",
+        "updatedAt": "2026-11-10T12:16:11.825Z",
+        "_id": "exp_1794312971825_ifn2d"
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-10T12:16:11.980Z",
+    "updatedAt": "2026-11-10T12:16:11.980Z"
+  },
+  {
+    "_id": "audit_1794304015904_bv7kgg",
+    "id": "audit_1794304015904_bv7kgg",
+    "timestamp": "2026-11-10T09:46:55.904Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794304014928_vnfzw",
+    "targetTitle": "Lead Cloud Architecture Intern at Google Cloud Labs",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794304014928_vnfzw",
+        "role": "Lead Cloud Architecture Intern",
+        "title": "Lead Cloud Architecture Intern",
+        "company": "Google Cloud Labs",
+        "period": "Jan 2026 - Present",
+        "duration": "Jan 2026 - Present",
+        "location": "Remote / Hybrid",
+        "description": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "details": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "skills": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "tech": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "category": "ai",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794304014928_vnfzw",
+        "authorUid": "admin",
+        "createdAt": "2026-11-10T09:46:54.928Z",
+        "updatedAt": "2026-11-10T09:46:55.356Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794304014928_vnfzw"
+    },
+    "createdAt": "2026-11-10T09:46:55.904Z",
+    "updatedAt": "2026-11-10T09:46:55.904Z"
+  },
+  {
+    "_id": "audit_1794304015492_rlz76b",
+    "id": "audit_1794304015492_rlz76b",
+    "timestamp": "2026-11-10T09:46:55.492Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794304014928_vnfzw",
+    "targetTitle": "Lead Cloud Architecture Intern at Google Cloud Labs",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794304014928_vnfzw",
+        "role": "Test Cloud Architecture Intern",
+        "title": "Test Cloud Architecture Intern",
+        "company": "Google Cloud Labs",
+        "period": "Jan 2026 - Present",
+        "duration": "Jan 2026 - Present",
+        "location": "Remote / Hybrid",
+        "description": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "details": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "skills": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "tech": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "category": "ai",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794304014928_vnfzw",
+        "authorUid": "admin",
+        "createdAt": "2026-11-10T09:46:54.928Z",
+        "updatedAt": "2026-11-10T09:46:54.928Z"
+      },
+      "after": {
+        "role": "Lead Cloud Architecture Intern",
+        "title": "Lead Cloud Architecture Intern",
+        "company": "Google Cloud Labs",
+        "period": "Jan 2026 - Present",
+        "duration": "Jan 2026 - Present",
+        "location": "Remote / Hybrid",
+        "description": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "details": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "skills": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "tech": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "category": "ai",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794304014928_vnfzw",
+        "authorUid": "admin",
+        "createdAt": "2026-11-10T09:46:54.928Z",
+        "updatedAt": "2026-11-10T09:46:55.356Z",
+        "_id": "exp_1794304014928_vnfzw"
+      },
+      "modifiedFields": [
+        "role",
+        "title",
+        "company",
+        "period",
+        "duration",
+        "category"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/exp_1794304014928_vnfzw"
+    },
+    "createdAt": "2026-11-10T09:46:55.492Z",
+    "updatedAt": "2026-11-10T09:46:55.492Z"
+  },
+  {
+    "_id": "audit_1794304015065_e8m0ai",
+    "id": "audit_1794304015065_e8m0ai",
+    "timestamp": "2026-11-10T09:46:55.065Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794304014928_vnfzw",
+    "targetTitle": "Test Cloud Architecture Intern at Google Cloud Labs",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "Test Cloud Architecture Intern",
+        "title": "Test Cloud Architecture Intern",
+        "company": "Google Cloud Labs",
+        "period": "Jan 2026 - Present",
+        "duration": "Jan 2026 - Present",
+        "location": "Remote / Hybrid",
+        "description": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "details": [
+          "Designing cloud workflows",
+          "Evaluating model inference speed"
+        ],
+        "skills": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "tech": [
+          "Google Cloud",
+          "Kubernetes",
+          "Python"
+        ],
+        "category": "ai",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794304014928_vnfzw",
+        "authorUid": "admin",
+        "createdAt": "2026-11-10T09:46:54.928Z",
+        "updatedAt": "2026-11-10T09:46:54.928Z",
+        "_id": "exp_1794304014928_vnfzw"
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-10T09:46:55.066Z",
+    "updatedAt": "2026-11-10T09:46:55.066Z"
+  },
+  {
+    "_id": "audit_1794222976480_2s1m90",
+    "id": "audit_1794222976480_2s1m90",
+    "timestamp": "2026-11-09T11:16:16.480Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794222975506_dtp7m",
+    "targetTitle": "Staff Software Engineer at DeepMind Tech AI (Global Lab)",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794222975506_dtp7m",
+        "role": "Staff Software Engineer",
+        "title": "Staff Software Engineer",
+        "company": "DeepMind Tech AI (Global Lab)",
+        "period": "2024 - Present",
+        "duration": "2024 - Present",
+        "location": "Bengaluru & Remote",
+        "description": [
+          "Leading core distributed systems architecture"
+        ],
+        "details": [
+          "Leading core distributed systems architecture"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222975506_dtp7m",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:16:15.506Z",
+        "updatedAt": "2026-11-09T11:16:15.924Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794222975506_dtp7m"
+    },
+    "createdAt": "2026-11-09T11:16:16.480Z",
+    "updatedAt": "2026-11-09T11:16:16.480Z"
+  },
+  {
+    "_id": "audit_1794222976062_2ndlij",
+    "id": "audit_1794222976062_2ndlij",
+    "timestamp": "2026-11-09T11:16:16.062Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794222975506_dtp7m",
+    "targetTitle": "Staff Software Engineer at DeepMind Tech AI (Global Lab)",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794222975506_dtp7m",
+        "role": "Staff Software Engineer",
+        "title": "Staff Software Engineer",
+        "company": "DeepMind Tech AI",
+        "period": "2026 - Present",
+        "duration": "2026 - Present",
+        "location": "Bengaluru, India",
+        "description": [
+          "Leading core distributed systems architecture"
+        ],
+        "details": [
+          "Leading core distributed systems architecture"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222975506_dtp7m",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:16:15.506Z",
+        "updatedAt": "2026-11-09T11:16:15.506Z"
+      },
+      "after": {
+        "role": "Staff Software Engineer",
+        "title": "Staff Software Engineer",
+        "company": "DeepMind Tech AI (Global Lab)",
+        "period": "2024 - Present",
+        "duration": "2024 - Present",
+        "location": "Bengaluru & Remote",
+        "description": [
+          "Leading core distributed systems architecture"
+        ],
+        "details": [
+          "Leading core distributed systems architecture"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222975506_dtp7m",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:16:15.506Z",
+        "updatedAt": "2026-11-09T11:16:15.924Z",
+        "_id": "exp_1794222975506_dtp7m"
+      },
+      "modifiedFields": [
+        "company",
+        "period",
+        "duration",
+        "location"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/exp_1794222975506_dtp7m"
+    },
+    "createdAt": "2026-11-09T11:16:16.062Z",
+    "updatedAt": "2026-11-09T11:16:16.062Z"
+  },
+  {
+    "_id": "audit_1794222975644_20fx12",
+    "id": "audit_1794222975644_20fx12",
+    "timestamp": "2026-11-09T11:16:15.644Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794222975506_dtp7m",
+    "targetTitle": "Staff Software Engineer at DeepMind Tech AI",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "Staff Software Engineer",
+        "title": "Staff Software Engineer",
+        "company": "DeepMind Tech AI",
+        "period": "2026 - Present",
+        "duration": "2026 - Present",
+        "location": "Bengaluru, India",
+        "description": [
+          "Leading core distributed systems architecture"
+        ],
+        "details": [
+          "Leading core distributed systems architecture"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222975506_dtp7m",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:16:15.506Z",
+        "updatedAt": "2026-11-09T11:16:15.506Z",
+        "_id": "exp_1794222975506_dtp7m"
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-09T11:16:15.645Z",
+    "updatedAt": "2026-11-09T11:16:15.645Z"
+  },
+  {
+    "_id": "audit_1794222642164_i5kg38",
+    "id": "audit_1794222642164_i5kg38",
+    "timestamp": "2026-11-09T11:10:42.164Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794222641195_azwtb",
+    "targetTitle": "Lead Cloud Architect at Google Cloud Platform Premier Partner",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794222641195_azwtb",
+        "role": "Lead Cloud Architect",
+        "title": "Lead Cloud Architect",
+        "company": "Google Cloud Platform Premier Partner",
+        "period": "2024 - Present",
+        "duration": "2024 - Present",
+        "location": "Bengaluru, India",
+        "description": [
+          "Architecting distributed serverless systems"
+        ],
+        "details": [
+          "Architecting distributed serverless systems"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222641195_azwtb",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:10:41.195Z",
+        "updatedAt": "2026-11-09T11:10:41.610Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794222641195_azwtb"
+    },
+    "createdAt": "2026-11-09T11:10:42.164Z",
+    "updatedAt": "2026-11-09T11:10:42.164Z"
+  },
+  {
+    "_id": "audit_1794222641748_05r0ez",
+    "id": "audit_1794222641748_05r0ez",
+    "timestamp": "2026-11-09T11:10:41.748Z",
+    "action": "UPDATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794222641195_azwtb",
+    "targetTitle": "Lead Cloud Architect at Google Cloud Platform Premier Partner",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "exp_1794222641195_azwtb",
+        "role": "Lead Cloud Architect",
+        "title": "Lead Cloud Architect",
+        "company": "Google Cloud Platform Partner",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "location": "Bengaluru, India",
+        "description": [
+          "Architecting distributed serverless systems"
+        ],
+        "details": [
+          "Architecting distributed serverless systems"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222641195_azwtb",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:10:41.195Z",
+        "updatedAt": "2026-11-09T11:10:41.195Z"
+      },
+      "after": {
+        "role": "Lead Cloud Architect",
+        "title": "Lead Cloud Architect",
+        "company": "Google Cloud Platform Premier Partner",
+        "period": "2024 - Present",
+        "duration": "2024 - Present",
+        "location": "Bengaluru, India",
+        "description": [
+          "Architecting distributed serverless systems"
+        ],
+        "details": [
+          "Architecting distributed serverless systems"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222641195_azwtb",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:10:41.195Z",
+        "updatedAt": "2026-11-09T11:10:41.610Z",
+        "_id": "exp_1794222641195_azwtb"
+      },
+      "modifiedFields": [
+        "company",
+        "period",
+        "duration"
+      ]
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "PUT",
+      "endpoint": "/api/experience/exp_1794222641195_azwtb"
+    },
+    "createdAt": "2026-11-09T11:10:41.748Z",
+    "updatedAt": "2026-11-09T11:10:41.748Z"
+  },
+  {
+    "_id": "audit_1794222641330_95qcyb",
+    "id": "audit_1794222641330_95qcyb",
+    "timestamp": "2026-11-09T11:10:41.330Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794222641195_azwtb",
+    "targetTitle": "Lead Cloud Architect at Google Cloud Platform Partner",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "Lead Cloud Architect",
+        "title": "Lead Cloud Architect",
+        "company": "Google Cloud Platform Partner",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "location": "Bengaluru, India",
+        "description": [
+          "Architecting distributed serverless systems"
+        ],
+        "details": [
+          "Architecting distributed serverless systems"
+        ],
+        "skills": [],
+        "tech": [],
+        "category": "web",
+        "categoryLabel": "Web & Full Stack",
+        "id": "exp_1794222641195_azwtb",
+        "authorUid": "admin",
+        "createdAt": "2026-11-09T11:10:41.195Z",
+        "updatedAt": "2026-11-09T11:10:41.195Z",
+        "_id": "exp_1794222641195_azwtb"
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "node",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-09T11:10:41.330Z",
+    "updatedAt": "2026-11-09T11:10:41.330Z"
+  },
+  {
+    "_id": "audit_1794402839862_3nm28b",
+    "id": "audit_1794402839862_3nm28b",
+    "timestamp": "2026-11-11T13:13:59.862Z",
+    "action": "CREATE",
+    "collectionName": "certifications",
+    "targetId": "cert_1794402839759_c8srr",
+    "targetTitle": "TCS AI Hackathon Certificate (TCS ION)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "title": "TCS AI Hackathon Certificate",
+        "issuer": "TCS ION",
+        "date": "5th Nov 2026",
+        "category": "other",
+        "categoryLabel": "Other Courses",
+        "credentialId": "SK-839748",
+        "skills": [
+          "AI"
+        ],
+        "image": "",
+        "file": "[Uploaded Media/PDF (4590 KB)]",
+        "preview": "",
+        "link": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "id": "cert_1794402839759_c8srr",
+        "_id": "cert_1794402839759_c8srr",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T13:13:59.830Z",
+        "updatedAt": "2026-11-11T13:13:59.830Z",
+        "credentialUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "verifyUrl": "https://www.tcsion.com/iDH/user/credential/view/1016-81f53b1e-d897-11f1-b73f-005056b47784",
+        "featured": false
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/certifications"
+    },
+    "createdAt": "2026-11-11T13:13:59.862Z",
+    "updatedAt": "2026-11-11T13:13:59.862Z"
+  },
+  {
+    "_id": "audit_1794402914273_2jwsic",
+    "id": "audit_1794402914273_2jwsic",
+    "timestamp": "2026-11-11T13:15:14.273Z",
+    "action": "DELETE",
+    "collectionName": "skills",
+    "targetId": "skill_frontend_5_redux_toolkit",
+    "targetTitle": "Redux Toolkit (Frontend Development)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "_id": "skill_frontend_5_redux_toolkit",
+        "id": "skill_frontend_5_redux_toolkit",
+        "domainId": "frontend",
+        "domainTitle": "Frontend Development",
+        "name": "Redux Toolkit",
+        "level": "Proficient",
+        "icon": "fas fa-diagram-project",
+        "highlight": false,
+        "createdAt": "2026-11-10T11:53:29.884Z",
+        "updatedAt": "2026-11-10T11:53:29.884Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/skills/skill_frontend_5_redux_toolkit"
+    },
+    "createdAt": "2026-11-11T13:15:14.273Z",
+    "updatedAt": "2026-11-11T13:15:14.273Z"
+  },
+  {
+    "_id": "audit_1794404124311_2mth7w",
+    "id": "audit_1794404124311_2mth7w",
+    "timestamp": "2026-11-11T13:35:24.311Z",
+    "action": "CREATE",
+    "collectionName": "experience",
+    "targetId": "exp_1794404124302_f8yhe",
+    "targetTitle": "AI & Machine Learning Intern at tcs",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": null,
+        "id": "exp_1794404124302_f8yhe",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T13:35:24.307Z",
+        "updatedAt": "2026-11-11T13:35:24.307Z",
+        "_id": "exp_1794404124302_f8yhe",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/experience"
+    },
+    "createdAt": "2026-11-11T13:35:24.311Z",
+    "updatedAt": "2026-11-11T13:35:24.311Z"
+  },
+  {
+    "_id": "audit_1794404211601_qj38mn",
+    "id": "audit_1794404211601_qj38mn",
+    "timestamp": "2026-11-11T13:36:51.601Z",
+    "action": "DELETE",
+    "collectionName": "experience",
+    "targetId": "exp_1794404124302_f8yhe",
+    "targetTitle": "AI & Machine Learning Intern at tcs",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "role": "AI & Machine Learning Intern",
+        "title": "AI & Machine Learning Intern",
+        "company": "tcs",
+        "location": "Remote",
+        "period": "2025 - 2026",
+        "duration": "2025 - 2026",
+        "category": "ai",
+        "categoryLabel": "AI & Machine Learning",
+        "skills": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "tech": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "description": [],
+        "details": [],
+        "certificate": null,
+        "id": "exp_1794404124302_f8yhe",
+        "authorUid": "sachin@portfolio",
+        "createdAt": "2026-11-11T13:35:24.307Z",
+        "updatedAt": "2026-11-11T13:35:24.307Z",
+        "_id": "exp_1794404124302_f8yhe",
+        "type": "Internship",
+        "achievements": [],
+        "technologies": [
+          "Python",
+          "Machine Learning",
+          "Deep Learning"
+        ],
+        "featured": false
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/experience/exp_1794404124302_f8yhe"
+    },
+    "createdAt": "2026-11-11T13:36:51.601Z",
+    "updatedAt": "2026-11-11T13:36:51.601Z"
+  },
+  {
+    "_id": "audit_1794397096763_q67bte",
+    "id": "audit_1794397096763_q67bte",
+    "timestamp": "2026-11-11T11:38:16.763Z",
+    "action": "DELETE",
+    "collectionName": "skills",
+    "targetId": "skill_tools-devops_2_linux___bash",
+    "targetTitle": "Linux / Bash (DevOps & Developer Tools)",
+    "changedBy": {
+      "username": "sachin@portfolio",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar",
+      "role": "admin",
+      "userId": "doc_1794218397027_k5du7n"
+    },
+    "diff": {
+      "before": {
+        "id": "skill_tools-devops_2_linux___bash",
+        "_id": "skill_tools-devops_2_linux___bash",
+        "domainId": "tools-devops",
+        "domainTitle": "DevOps & Developer Tools",
+        "name": "Linux / Bash",
+        "level": "Proficient",
+        "icon": "fab fa-linux",
+        "highlight": false,
+        "createdAt": "2026-11-10T12:46:44.130Z",
+        "updatedAt": "2026-11-10T12:46:44.130Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/skills/skill_tools-devops_2_linux___bash"
+    },
+    "createdAt": "2026-11-11T11:38:16.763Z",
+    "updatedAt": "2026-11-11T11:38:16.763Z"
+  }
+]

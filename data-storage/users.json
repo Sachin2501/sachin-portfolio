@@ -1,0 +1,38 @@
+[
+  {
+    "_id": "doc_1794216971970_ju82mt",
+    "username": "sachin_admin",
+    "email": "sachin@portfolio.dev",
+    "name": "Sachin Kumar",
+    "role": "admin",
+    "passwordSalt": "4e1bd3b67ec851b9d2d85f5a44109df1",
+    "passwordHash": "d223d4390c43a79f0bc73ae3fea92bc33dff496d0f9c95feb21fbbb163baf715",
+    "createdAt": "2026-11-09T09:36:11.970Z",
+    "updatedAt": "2026-11-09T09:36:11.970Z",
+    "id": "doc_1794216971970_ju82mt"
+  },
+  {
+    "_id": "doc_1794218397027_k5du7n",
+    "username": "sachin@portfolio",
+    "email": "sachinkumar.gheura@gmail.com",
+    "name": "Sachin Kumar",
+    "role": "admin",
+    "passwordSalt": "ea8eb54eaba57a7d1bf646ad01b99a0f",
+    "passwordHash": "a69e208fbd521978503b968cbad82113cefa5666aaf1990ce3f656165585e936",
+    "createdAt": "2026-11-09T09:59:57.027Z",
+    "updatedAt": "2026-11-10T13:36:14.018Z",
+    "id": "doc_1794218397027_k5du7n"
+  },
+  {
+    "_id": "user_admin_default",
+    "id": "user_admin_default",
+    "username": "admin",
+    "email": "sachinkumar.gheura@gmail.com",
+    "name": "Sachin Kumar",
+    "role": "admin",
+    "passwordSalt": "sachin_portfolio_salt_2026",
+    "passwordHash": "3989907f07980f390ab703b199ece0d71f732f9c4fe2071e13fe289be7e8e310",
+    "createdAt": "2026-11-09T09:36:07.704Z",
+    "updatedAt": "2026-11-09T09:36:07.704Z"
+  }
+]

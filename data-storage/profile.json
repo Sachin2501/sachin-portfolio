@@ -1,0 +1,16 @@
+[
+  {
+    "_id": "config",
+    "id": "config",
+    "name": "Sachin Kumar",
+    "title": "Software Engineer & AI/ML Developer",
+    "authorUid": "sachin@portfolio",
+    "updatedAt": "2026-11-11T12:08:40.866Z",
+    "createdAt": "2026-11-09T10:42:34.326Z",
+    "aboutImage": "/assets/aistudio/dev-intro-card_360f1a33.svg",
+    "bioLead": "Building intelligent solutions and cutting-edge web applications with a focus on user experience and performance.",
+    "heroImage": "/assets/aistudio/Polished_Corporate_Headshot_on_Gray_77b053e0.png",
+    "logoImage": "/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png",
+    "resumeUrl": "/certificates/resume.pdf"
+  }
+]

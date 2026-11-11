@@ -1,0 +1,329 @@
+[
+  {
+    "_id": "infosys-ai-6",
+    "id": "infosys-ai-6",
+    "role": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+    "company": "Infosys Springboard",
+    "duration": "5th Nov 2025 - 10th Jan 2026",
+    "category": "ai",
+    "categoryLabel": "AI & Machine Learning",
+    "certificate": {
+      "id": "infosys-internship-cert",
+      "title": "Infosys Springboard Virtual Internship 6.0 Completion Certificate",
+      "issuer": "Infosys",
+      "date": "March 2026",
+      "file": "/certificates/Infosys Sprinboard Internship certificate.pdf",
+      "preview": "/certificates/previews/Infosys Sprinboard Internship certificate.png",
+      "image": "/certificates/Infosys Sprinboard Internship certificate.pdf"
+    },
+    "details": [
+      "Understanding core principles and methodologies of AI and Machine Learning.",
+      "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+      "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+    ],
+    "tech": [
+      "Deep Learning",
+      "Machine Learning",
+      "Python",
+      "NumPy",
+      "Flask",
+      "OpenCV"
+    ],
+    "createdAt": "2026-11-10T11:53:33.197Z",
+    "updatedAt": "2026-11-11T10:13:54.683Z",
+    "achievements": [],
+    "description": [
+      "Understanding core principles and methodologies of AI and Machine Learning.",
+      "Developing technical proficiency in Python programming, data preprocessing, and model building.",
+      "Gaining exposure to real-world applications of AI through guided learning modules and case-based assessments."
+    ],
+    "featured": false,
+    "location": "Remote",
+    "period": "5th Nov 2025 - 10th Jan 2026",
+    "skills": [
+      "Deep Learning",
+      "Machine Learning",
+      "Python",
+      "NumPy",
+      "Flask",
+      "OpenCV"
+    ],
+    "technologies": [
+      "Deep Learning",
+      "Machine Learning",
+      "Python",
+      "NumPy",
+      "Flask",
+      "OpenCV"
+    ],
+    "title": "AI Intern - Infosys Springboard Virtual Internship 6.0",
+    "type": "Internship"
+  },
+  {
+    "_id": "ibm-fwd",
+    "id": "ibm-fwd",
+    "role": "Front-End Web Development Intern",
+    "company": "IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+    "duration": "21st Aug 2025 - 2nd Oct 2025",
+    "category": "web",
+    "categoryLabel": "Web & Full Stack",
+    "certificate": {
+      "id": "ibm-fwd-internship-cert",
+      "title": "Internship Completion Certificate (Front-End Development)",
+      "issuer": "IBM SkillsBuild & Edunet Foundation (AICTE)",
+      "date": "September 2025",
+      "file": "/certificates/ibm-fwd-internship.pdf",
+      "preview": "/certificates/previews/ibm-fwd-internship.png",
+      "image": "/certificates/ibm-fwd-internship.pdf"
+    },
+    "details": [
+      "Developed responsive and interactive web interfaces with modern CSS & JavaScript.",
+      "Created user-friendly designs and components adhering to accessibility guidelines.",
+      "Built portfolio projects showcasing scalable frontend architecture."
+    ],
+    "tech": [
+      "HTML5",
+      "CSS3",
+      "JavaScript",
+      "Responsive Design"
+    ],
+    "createdAt": "2026-11-10T11:53:33.350Z",
+    "updatedAt": "2026-11-11T10:13:55.172Z",
+    "achievements": [],
+    "description": [
+      "Developed responsive and interactive web interfaces with modern CSS & JavaScript.",
+      "Created user-friendly designs and components adhering to accessibility guidelines.",
+      "Built portfolio projects showcasing scalable frontend architecture."
+    ],
+    "featured": false,
+    "location": "Remote",
+    "period": "21st Aug 2025 - 2nd Oct 2025",
+    "skills": [
+      "HTML5",
+      "CSS3",
+      "JavaScript",
+      "Responsive Design"
+    ],
+    "technologies": [
+      "HTML5",
+      "CSS3",
+      "JavaScript",
+      "Responsive Design"
+    ],
+    "title": "Front-End Web Development Intern",
+    "type": "Internship"
+  },
+  {
+    "_id": "ibm-aiml",
+    "id": "ibm-aiml",
+    "role": "AI & Machine Learning Intern",
+    "company": "IBM SkillsBuild collaboration with Edunet Foundation & AICTE",
+    "duration": "18th June 2025 - 30th July 2025",
+    "category": "ai",
+    "categoryLabel": "AI & Machine Learning",
+    "certificate": {
+      "id": "ibm-aiml-internship-cert",
+      "title": "Internship Completion Certificate (AI & ML)",
+      "issuer": "IBM SkillsBuild & Edunet Foundation (AICTE)",
+      "date": "July 2025",
+      "file": "/certificates/ibm-aiml-internship.pdf",
+      "preview": "/certificates/previews/ibm-aiml-internship.png",
+      "image": "/certificates/ibm-aiml-internship.pdf"
+    },
+    "details": [
+      "Specialized in artificial intelligence, machine learning, and data preprocessing.",
+      "Implemented ML models for predictive data analysis and evaluation.",
+      "Engineered end-to-end data pipelines for structured datasets."
+    ],
+    "tech": [
+      "AI/ML",
+      "Data Science",
+      "Python",
+      "TensorFlow"
+    ],
+    "createdAt": "2026-11-10T11:53:33.492Z",
+    "updatedAt": "2026-11-11T10:13:55.695Z",
+    "achievements": [],
+    "description": [
+      "Specialized in artificial intelligence, machine learning, and data preprocessing.",
+      "Implemented ML models for predictive data analysis and evaluation.",
+      "Engineered end-to-end data pipelines for structured datasets."
+    ],
+    "featured": false,
+    "location": "Remote",
+    "period": "18th June 2025 - 30th July 2025",
+    "skills": [
+      "AI/ML",
+      "Data Science",
+      "Python",
+      "TensorFlow"
+    ],
+    "technologies": [
+      "AI/ML",
+      "Data Science",
+      "Python",
+      "TensorFlow"
+    ],
+    "title": "AI & Machine Learning Intern",
+    "type": "Internship"
+  },
+  {
+    "_id": "ms-ai-foundations",
+    "id": "ms-ai-foundations",
+    "role": "AI Intern - Foundations of Artificial Intelligence",
+    "company": "Microsoft collaboration with Edunet Foundation & AICTE",
+    "duration": "10th April 2025 - 10th May 2025",
+    "category": "ai",
+    "categoryLabel": "AI & Machine Learning",
+    "certificate": {
+      "id": "ms-ai-internship-cert",
+      "title": "Internship Completion Certificate (Foundation of AI)",
+      "issuer": "Microsoft & Edunet Foundation (AICTE)",
+      "date": "May 2025",
+      "file": "/certificates/microsoft-ai-internship.pdf",
+      "preview": "/certificates/previews/microsoft-ai-internship.png",
+      "image": "/certificates/microsoft-ai-internship.pdf"
+    },
+    "details": [
+      "Focused on core foundations of artificial intelligence and optimization methods.",
+      "Studied foundational supervised and unsupervised machine learning algorithms.",
+      "Implemented neural network prototypes and problem-solving workflows."
+    ],
+    "tech": [
+      "AI Fundamentals",
+      "Machine Learning",
+      "Algorithms"
+    ],
+    "createdAt": "2026-11-10T11:53:33.639Z",
+    "updatedAt": "2026-11-11T10:13:56.170Z",
+    "achievements": [],
+    "description": [
+      "Focused on core foundations of artificial intelligence and optimization methods.",
+      "Studied foundational supervised and unsupervised machine learning algorithms.",
+      "Implemented neural network prototypes and problem-solving workflows."
+    ],
+    "featured": false,
+    "location": "Remote",
+    "period": "10th April 2025 - 10th May 2025",
+    "skills": [
+      "AI Fundamentals",
+      "Machine Learning",
+      "Algorithms"
+    ],
+    "technologies": [
+      "AI Fundamentals",
+      "Machine Learning",
+      "Algorithms"
+    ],
+    "title": "AI Intern - Foundations of Artificial Intelligence",
+    "type": "Internship"
+  },
+  {
+    "_id": "ey-mern",
+    "id": "ey-mern",
+    "role": "MERN Stack Intern",
+    "company": "EY Global Delivery Services (in collaboration with AICTE & Edunet Foundation)",
+    "duration": "10th Feb 2025 - 21st March 2025",
+    "category": "web",
+    "categoryLabel": "Web & Full Stack",
+    "certificate": {
+      "id": "ey-internship-cert",
+      "title": "Internship Completion Certificate (MERN Stack)",
+      "issuer": "EY Global Delivery Services & AICTE",
+      "date": "March 2025",
+      "file": "/certificates/Ey-gds-internship.pdf",
+      "preview": "/certificates/previews/Ey-gds-internship.png",
+      "image": "/certificates/Ey-gds-internship.pdf"
+    },
+    "details": [
+      "Completed intensive full-stack MERN engineering internship.",
+      "Developed full-stack web applications using MongoDB, Express, React, and Node.js.",
+      "Architected RESTful APIs and connected real-time MongoDB database schemas."
+    ],
+    "tech": [
+      "MongoDB",
+      "Express.js",
+      "React",
+      "Node.js",
+      "JavaScript"
+    ],
+    "createdAt": "2026-11-10T11:53:33.782Z",
+    "updatedAt": "2026-11-11T10:13:56.663Z",
+    "achievements": [],
+    "description": [
+      "Completed intensive full-stack MERN engineering internship.",
+      "Developed full-stack web applications using MongoDB, Express, React, and Node.js.",
+      "Architected RESTful APIs and connected real-time MongoDB database schemas."
+    ],
+    "featured": false,
+    "location": "Remote",
+    "period": "10th Feb 2025 - 21st March 2025",
+    "skills": [
+      "MongoDB",
+      "Express.js",
+      "React",
+      "Node.js",
+      "JavaScript"
+    ],
+    "technologies": [
+      "MongoDB",
+      "Express.js",
+      "React",
+      "Node.js",
+      "JavaScript"
+    ],
+    "title": "MERN Stack Intern",
+    "type": "Internship"
+  },
+  {
+    "_id": "ms-sap-techsaksham",
+    "id": "ms-sap-techsaksham",
+    "role": "AI Intern (Transformative Learning with TechSaksham)",
+    "company": "Microsoft & SAP CSR Initiative collaboration with Edunet Foundation & AICTE",
+    "duration": "16th Jan 2025 - 15th Feb 2025",
+    "category": "ai",
+    "categoryLabel": "AI & Machine Learning",
+    "certificate": {
+      "id": "ms-sap-internship-cert",
+      "title": "Internship Completion Certificate (AI: Transformative Learning with TechSaksham)",
+      "issuer": "Microsoft & SAP CSR Initiative",
+      "date": "February 2025",
+      "file": "/certificates/microsoft-sap-internship.pdf",
+      "preview": "/certificates/previews/microsoft-sap-internship.png",
+      "image": "/certificates/microsoft-sap-internship.pdf"
+    },
+    "details": [
+      "Built AI solutions under the joint CSR initiative of Microsoft and SAP.",
+      "Developed AI prototypes solving real-world educational technology challenges.",
+      "Collaborated directly with industry mentors from Microsoft and SAP."
+    ],
+    "tech": [
+      "Artificial Intelligence",
+      "Machine Learning",
+      "Python"
+    ],
+    "createdAt": "2026-11-10T11:53:33.925Z",
+    "updatedAt": "2026-11-11T10:13:57.145Z",
+    "achievements": [],
+    "description": [
+      "Built AI solutions under the joint CSR initiative of Microsoft and SAP.",
+      "Developed AI prototypes solving real-world educational technology challenges.",
+      "Collaborated directly with industry mentors from Microsoft and SAP."
+    ],
+    "featured": false,
+    "location": "Remote",
+    "period": "16th Jan 2025 - 15th Feb 2025",
+    "skills": [
+      "Artificial Intelligence",
+      "Machine Learning",
+      "Python"
+    ],
+    "technologies": [
+      "Artificial Intelligence",
+      "Machine Learning",
+      "Python"
+    ],
+    "title": "AI Intern (Transformative Learning with TechSaksham)",
+    "type": "Internship"
+  }
+]

@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Admin authorization check: checks designated admin document or matching admin email
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == "sachinkumar.gheura@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    // Validation helpers
+    function isValidProject(data) {
+      return data.title is string && data.title.size() <= 150 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.authorUid is string && data.authorUid.size() <= 128;
+    }
+
+    function isValidCert(data) {
+      return data.title is string && data.title.size() <= 150 &&
+             data.issuer is string && data.issuer.size() <= 150 &&
+             data.authorUid is string && data.authorUid.size() <= 128;
+    }
+
+    function isValidEducation(data) {
+      return data.degree is string && data.degree.size() <= 150 &&
+             data.institute is string && data.institute.size() <= 200 &&
+             data.authorUid is string && data.authorUid.size() <= 128;
+    }
+
+    function isValidSkill(data) {
+      return data.domainId is string && data.domainId.size() <= 80 &&
+             data.name is string && data.name.size() <= 80 &&
+             data.authorUid is string && data.authorUid.size() <= 128;
+    }
+
+    function isValidExperience(data) {
+      return data.role is string && data.role.size() <= 150 &&
+             data.company is string && data.company.size() <= 150 &&
+             data.authorUid is string && data.authorUid.size() <= 128;
+    }
+
+    function isValidProfile(data) {
+      return data.authorUid is string && data.authorUid.size() <= 128;
+    }
+
+    // Public readable portfolio collections; writable only by verified Admin
+    match /projects/{projectId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(projectId) && isValidProject(incoming());
+      allow update: if isAdmin() && isValidId(projectId) && isValidProject(incoming());
+      allow delete: if isAdmin() && isValidId(projectId);
+    }
+
+    match /certifications/{certId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(certId) && isValidCert(incoming());
+      allow update: if isAdmin() && isValidId(certId) && isValidCert(incoming());
+      allow delete: if isAdmin() && isValidId(certId);
+    }
+
+    match /education/{eduId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(eduId) && isValidEducation(incoming());
+      allow update: if isAdmin() && isValidId(eduId) && isValidEducation(incoming());
+      allow delete: if isAdmin() && isValidId(eduId);
+    }
+
+    match /skills/{skillId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(skillId) && isValidSkill(incoming());
+      allow update: if isAdmin() && isValidId(skillId) && isValidSkill(incoming());
+      allow delete: if isAdmin() && isValidId(skillId);
+    }
+
+    match /experience/{expId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(expId) && isValidExperience(incoming());
+      allow update: if isAdmin() && isValidId(expId) && isValidExperience(incoming());
+      allow delete: if isAdmin() && isValidId(expId);
+    }
+
+    match /profile/{profileId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(profileId) && isValidProfile(incoming());
+      allow delete: if isAdmin() && isValidId(profileId);
+    }
+
+    match /admins/{adminUid} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Audit logs collection (Admin read-only, create by admin, immutable: no update or delete)
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidId(logId);
+      allow update, delete: if false;
+    }
+  }
+}

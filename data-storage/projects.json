@@ -1,0 +1,134 @@
+[
+  {
+    "_id": "portfolio",
+    "title": "Portfolio Website",
+    "description": "A personal portfolio website to showcase my projects, skills, and experience with a modern and responsive design.",
+    "category": "Frontend & UI Engineering",
+    "technologies": [
+      "HTML",
+      "CSS3",
+      "JavaScript",
+      "Responsive Design",
+      "React"
+    ],
+    "tech": [
+      "HTML",
+      "CSS3",
+      "JavaScript",
+      "Responsive Design",
+      "React"
+    ],
+    "tags": [
+      "HTML",
+      "CSS3",
+      "JavaScript",
+      "Responsive Design",
+      "React"
+    ],
+    "features": [],
+    "github": "https://github.com/Sachin2501/Sachin_portfolio_website.io.git",
+    "githubUrl": "https://github.com/Sachin2501/Sachin_portfolio_website.io.git",
+    "githubLink": "https://github.com/Sachin2501/Sachin_portfolio_website.io.git",
+    "live": "https://sachin2501.github.io/portfolio_website.io/",
+    "liveUrl": "https://sachin2501.github.io/portfolio_website.io/",
+    "demoUrl": "https://sachin2501.github.io/portfolio_website.io/",
+    "demoLink": "https://sachin2501.github.io/portfolio_website.io/",
+    "image": "/images/My_portfolio.png",
+    "featured": true,
+    "status": "Completed",
+    "id": "portfolio",
+    "authorUid": "sachin@portfolio",
+    "createdAt": "2026-11-11T12:08:38.726Z",
+    "updatedAt": "2026-11-11T12:08:38.726Z"
+  },
+  {
+    "_id": "food-delivery",
+    "title": "Food Delivery App",
+    "description": "Full-stack food delivery platform with live order tracking, multiple payment options, and efficient delivery management system.",
+    "category": "Full Stack & MERN Architecture",
+    "technologies": [
+      "MongoDB",
+      "React",
+      "Express",
+      "JavaScript",
+      "Node.js",
+      "MERN"
+    ],
+    "tech": [
+      "MongoDB",
+      "React",
+      "Express",
+      "JavaScript",
+      "Node.js",
+      "MERN"
+    ],
+    "tags": [
+      "MongoDB",
+      "React",
+      "Express",
+      "JavaScript",
+      "Node.js",
+      "MERN"
+    ],
+    "features": [],
+    "github": "https://github.com/Sachin2501/Food_app_Client_frontend.git",
+    "githubUrl": "https://github.com/Sachin2501/Food_app_Client_frontend.git",
+    "githubLink": "https://github.com/Sachin2501/Food_app_Client_frontend.git",
+    "live": "https://food-app-client-frontend.vercel.app/",
+    "liveUrl": "https://food-app-client-frontend.vercel.app/",
+    "demoUrl": "https://food-app-client-frontend.vercel.app/",
+    "demoLink": "https://food-app-client-frontend.vercel.app/",
+    "image": "/images/Food_Delivery_App.png",
+    "featured": true,
+    "status": "Completed",
+    "id": "food-delivery",
+    "authorUid": "sachin@portfolio",
+    "createdAt": "2026-11-11T12:08:39.438Z",
+    "updatedAt": "2026-11-11T12:08:39.438Z"
+  },
+  {
+    "_id": "sign-language",
+    "title": "Sign Language Detection using Deep Learning",
+    "description": "Real-time sign language detection system using deep learning to convert hand gestures into text with high accuracy.",
+    "category": "Computer Vision & AI/ML",
+    "technologies": [
+      "AI/ML",
+      "Python",
+      "Deep Learning",
+      "TensorFlow",
+      "OpenCV",
+      "NumPy"
+    ],
+    "tech": [
+      "AI/ML",
+      "Python",
+      "Deep Learning",
+      "TensorFlow",
+      "OpenCV",
+      "NumPy"
+    ],
+    "tags": [
+      "AI/ML",
+      "Python",
+      "Deep Learning",
+      "TensorFlow",
+      "OpenCV",
+      "NumPy"
+    ],
+    "features": [],
+    "github": "https://github.com/Sachin2501/Sign_Language_Detection_DeepLearning_Project.git",
+    "githubUrl": "https://github.com/Sachin2501/Sign_Language_Detection_DeepLearning_Project.git",
+    "githubLink": "https://github.com/Sachin2501/Sign_Language_Detection_DeepLearning_Project.git",
+    "live": "https://www.linkedin.com/in/sachin-kumar-sharma2501/details/projects/526323928/multiple-media-viewer?profileId=ACoAAFExRwEBBj88OgurA3PVc3CGPo-ywb60RLg&treasuryMediaId=1746430531629&type=DOCUMENT&lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_projects_details%3BstDBS%2FN0TjiLUAa9L7DB3Q%3D%3D",
+    "liveUrl": "https://www.linkedin.com/in/sachin-kumar-sharma2501/details/projects/526323928/multiple-media-viewer?profileId=ACoAAFExRwEBBj88OgurA3PVc3CGPo-ywb60RLg&treasuryMediaId=1746430531629&type=DOCUMENT&lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_projects_details%3BstDBS%2FN0TjiLUAa9L7DB3Q%3D%3D",
+    "demoUrl": "https://www.linkedin.com/in/sachin-kumar-sharma2501/details/projects/526323928/multiple-media-viewer?profileId=ACoAAFExRwEBBj88OgurA3PVc3CGPo-ywb60RLg&treasuryMediaId=1746430531629&type=DOCUMENT&lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_projects_details%3BstDBS%2FN0TjiLUAa9L7DB3Q%3D%3D",
+    "demoLink": "https://www.linkedin.com/in/sachin-kumar-sharma2501/details/projects/526323928/multiple-media-viewer?profileId=ACoAAFExRwEBBj88OgurA3PVc3CGPo-ywb60RLg&treasuryMediaId=1746430531629&type=DOCUMENT&lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_projects_details%3BstDBS%2FN0TjiLUAa9L7DB3Q%3D%3D",
+    "image": "/images/Deep_Learning.jpg",
+    "featured": true,
+    "status": "Completed",
+    "id": "sign-language",
+    "authorUid": "sachin@portfolio",
+    "createdAt": "2026-11-11T12:08:40.130Z",
+    "updatedAt": "2026-11-11T12:08:40.130Z"
+  }
+]
