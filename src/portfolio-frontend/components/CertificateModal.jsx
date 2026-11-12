@@ -125,7 +125,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
 
   return (
     <div
-      className="modal-overlay"
+      className="modal-overlay cert-modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -138,44 +138,40 @@ export const CertificateModal = ({ certificate, onClose }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1rem',
       }}
     >
       <div
-        className="modal-container"
+        className="modal-container cert-modal-container"
         style={{
           width: '100%',
           maxWidth: '960px',
-          height: '90vh',
           display: 'flex',
           flexDirection: 'column',
           background: 'var(--bg-card, #0f172a)',
           color: 'var(--text-primary, #f8fafc)',
-          borderRadius: '16px',
           border: '1px solid var(--border-color, rgba(148, 163, 184, 0.2))',
           boxShadow: '0 25px 60px rgba(0, 0, 0, 0.65)',
           overflow: 'hidden',
         }}
       >
         <div
-          className="modal-header"
+          className="modal-header cert-modal-header"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1rem 1.25rem',
             borderBottom: '1px solid var(--border-color, rgba(148, 163, 184, 0.15))',
             background: 'var(--bg-secondary, #0b1120)',
             gap: '0.75rem',
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ overflow: 'hidden', paddingRight: '0.5rem', flex: '1 1 240px' }}>
+          <div className="cert-modal-title-wrap" style={{ overflow: 'hidden', paddingRight: '0.25rem', flex: '1 1 200px', minWidth: 0 }}>
             <h3
               title={certificate.title}
               style={{
                 margin: 0,
-                fontSize: '1.05rem',
+                fontSize: 'clamp(0.92rem, 2.5vw, 1.05rem)',
                 fontWeight: 700,
                 color: 'var(--text-primary, #f8fafc)',
                 whiteSpace: 'nowrap',
@@ -187,19 +183,23 @@ export const CertificateModal = ({ certificate, onClose }) => {
             </h3>
             <p
               style={{
-                margin: '0.2rem 0 0 0',
-                fontSize: '0.82rem',
+                margin: '0.18rem 0 0 0',
+                fontSize: '0.78rem',
                 color: 'var(--text-secondary, #94a3b8)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               <span>{certificate.issuer}</span>
               {certificate.date ? ` • ${certificate.date}` : ''}
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="cert-modal-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
             {hasPdfSource && imageCandidate && (
               <button
                 type="button"
+                className="cert-modal-switch-btn"
                 onClick={() => {
                   setImageError(false);
                   setPreferPdfView(!showAsPdf);
@@ -212,9 +212,9 @@ export const CertificateModal = ({ certificate, onClose }) => {
                     ? '1px solid rgba(6, 182, 212, 0.45)'
                     : '1px solid var(--border-color, rgba(148, 163, 184, 0.25))',
                   borderRadius: '8px',
-                  padding: '6px 12px',
+                  padding: '6px 11px',
                   color: showAsPdf ? '#22d3ee' : 'var(--text-primary, #f8fafc)',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 600,
                   cursor: 'pointer',
                   display: 'inline-flex',
@@ -224,7 +224,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
                 }}
               >
                 <i className={`fas ${showAsPdf ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                <span>{showAsPdf ? 'Switch to Image Preview' : 'Switch to PDF View'}</span>
+                <span>{showAsPdf ? 'Image Preview' : 'PDF View'}</span>
               </button>
             )}
 
@@ -238,9 +238,9 @@ export const CertificateModal = ({ certificate, onClose }) => {
                   background: 'var(--tag-bg, rgba(30, 41, 59, 0.9))',
                   border: '1px solid var(--border-color, rgba(148, 163, 184, 0.25))',
                   borderRadius: '8px',
-                  padding: '6px 12px',
+                  padding: '6px 11px',
                   color: 'var(--text-primary, #f8fafc)',
-                  fontSize: '0.82rem',
+                  fontSize: '0.78rem',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -273,6 +273,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 700,
+                flexShrink: 0,
               }}
             >
               ✕
@@ -281,7 +282,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
         </div>
 
         <div
-          className="modal-body"
+          className="modal-body cert-modal-body"
           style={{
             position: 'relative',
             flex: 1,
@@ -289,7 +290,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
             display: 'flex',
             alignItems: showAsPdf ? 'stretch' : isZoomed ? 'flex-start' : 'center',
             justifyContent: 'center',
-            padding: showAsPdf ? '0' : '1.2rem',
+            padding: showAsPdf ? '0' : 'clamp(0.6rem, 2vw, 1.2rem)',
             background: 'var(--bg-secondary, #0b1120)',
           }}
         >
@@ -334,11 +335,12 @@ export const CertificateModal = ({ certificate, onClose }) => {
                       flexDirection: 'column',
                       alignItems: 'center',
                       textAlign: 'center',
-                      padding: '2.5rem',
+                      padding: 'clamp(1.25rem, 4vw, 2.5rem)',
                       background: 'var(--bg-card, #1e293b)',
                       borderRadius: '16px',
                       border: '1px solid var(--border-color, rgba(148, 163, 184, 0.25))',
                       maxWidth: '520px',
+                      width: '100%',
                       boxShadow: '0 10px 30px rgba(0, 0, 0, 0.35)',
                     }}
                   >
@@ -360,7 +362,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
                     </div>
                     <h4
                       style={{
-                        fontSize: '1.2rem',
+                        fontSize: '1.15rem',
                         marginBottom: '0.5rem',
                         color: 'var(--text-primary, #f8fafc)',
                       }}
@@ -393,7 +395,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
                   style={{
                     maxWidth: isZoomed ? 'none' : '100%',
                     maxHeight: isZoomed ? 'none' : '100%',
-                    width: isZoomed ? '1200px' : 'auto',
+                    width: isZoomed ? 'min(1200px, 220vw)' : 'auto',
                     objectFit: 'contain',
                     borderRadius: '8px',
                     boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
@@ -411,14 +413,13 @@ export const CertificateModal = ({ certificate, onClose }) => {
         </div>
 
         <div
-          className="modal-footer"
+          className="modal-footer cert-modal-footer"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
-            gap: '0.75rem',
+            gap: '0.65rem',
             flexWrap: 'wrap',
-            padding: '0.9rem 1.25rem',
             borderTop: '1px solid var(--border-color, rgba(148, 163, 184, 0.15))',
             background: 'var(--bg-secondary, #0b1120)',
           }}
@@ -428,7 +429,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
               href={externalVerifyLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-outline"
+              className="btn btn-outline cert-footer-btn"
               style={{
                 color: '#38bdf8',
                 borderColor: 'rgba(56, 189, 248, 0.4)',
@@ -440,6 +441,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
                 textDecoration: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '0.5rem',
               }}
             >
@@ -454,7 +456,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
               download={`${(certificate.title || 'certificate')
                 .replace(/[^a-z0-9]/gi, '_')
                 .toLowerCase()}${hasPdfSource ? '.pdf' : '.png'}`}
-              className="btn"
+              className="btn cert-footer-btn"
               style={{
                 background: 'linear-gradient(135deg, #2563eb, #06b6d4)',
                 color: '#ffffff',
@@ -465,6 +467,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
                 textDecoration: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '0.5rem',
               }}
             >
@@ -476,7 +479,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-outline"
+            className="btn btn-outline cert-footer-btn"
             style={{
               padding: '8px 16px',
               fontSize: '0.86rem',
@@ -486,6 +489,9 @@ export const CertificateModal = ({ certificate, onClose }) => {
               color: 'var(--text-secondary, #94a3b8)',
               border: '1px solid var(--border-color, rgba(148, 163, 184, 0.25))',
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             Close

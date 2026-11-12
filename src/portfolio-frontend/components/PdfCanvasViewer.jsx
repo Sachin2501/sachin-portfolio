@@ -60,7 +60,32 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const [rendering, setRendering] = useState(true);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [pageDimensions, setPageDimensions] = useState({ width: 794, height: 1123 });
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return undefined;
+
+    const updateWidth = () => {
+      if (el.clientWidth) {
+        setContainerWidth(el.clientWidth);
+      }
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        updateWidth();
+      });
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -76,12 +101,13 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
         // Calculate high-DPI render scale for crisp text on all screens
         const dpr = Math.min(window.devicePixelRatio || 1, 2.25);
         const baseViewport = page.getViewport({ scale: 1.0 });
-        const containerWidth = wrapperRef.current?.clientWidth
-          ? Math.max(280, wrapperRef.current.clientWidth - 8)
-          : 820;
+        const measuredWidth =
+          containerWidth ||
+          (wrapperRef.current?.clientWidth ? wrapperRef.current.clientWidth : 820);
+        const availableWidth = Math.max(220, measuredWidth - 8);
 
         const effectiveScale = fitWidth
-          ? Math.min(1.6, Math.max(0.55, containerWidth / baseViewport.width)) * scale
+          ? Math.min(1.6, Math.max(0.25, availableWidth / baseViewport.width)) * scale
           : scale * 1.25;
 
         const displayViewport = page.getViewport({ scale: effectiveScale });
@@ -121,7 +147,7 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
         renderTask.cancel();
       }
     };
-  }, [pdfDoc, pageNumber, scale, fitWidth]);
+  }, [pdfDoc, pageNumber, scale, fitWidth, containerWidth]);
 
   return (
     <div
@@ -321,14 +347,15 @@ export const PdfCanvasViewer = ({
     >
       {/* Top PDF Control Toolbar */}
       <div
+        className="pdf-viewer-toolbar"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: compact ? '0.45rem 0.75rem' : '0.6rem 1.1rem',
+          padding: compact ? '0.45rem 0.7rem' : '0.55rem 0.9rem',
           background: 'rgba(15, 23, 42, 0.96)',
           borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
-          gap: '0.5rem',
+          gap: '0.45rem',
           flexWrap: 'wrap',
           flexShrink: 0,
         }}
@@ -337,10 +364,12 @@ export const PdfCanvasViewer = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
+            gap: '0.45rem',
             fontSize: '0.78rem',
             color: '#cbd5e1',
             fontWeight: 600,
+            minWidth: 0,
+            flex: '1 1 160px',
           }}
         >
           <span
@@ -350,15 +379,16 @@ export const PdfCanvasViewer = ({
               background: 'rgba(239, 68, 68, 0.2)',
               border: '1px solid rgba(239, 68, 68, 0.4)',
               color: '#f87171',
-              fontSize: '0.7rem',
+              fontSize: '0.68rem',
               fontWeight: 700,
+              flexShrink: 0,
             }}
           >
             PDF
           </span>
           <span
             style={{
-              maxWidth: '260px',
+              maxWidth: 'clamp(110px, 38vw, 260px)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -367,13 +397,13 @@ export const PdfCanvasViewer = ({
             {title}
           </span>
           {numPages > 0 && (
-            <span style={{ color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ color: '#94a3b8', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
               · {numPages} {numPages === 1 ? 'Page' : 'Pages'}
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
           <button
             type="button"
             onClick={() => {
@@ -381,12 +411,12 @@ export const PdfCanvasViewer = ({
               setScale((s) => Math.max(0.55, Number((s - 0.15).toFixed(2))));
             }}
             style={{
-              padding: '4px 10px',
+              padding: '4px 9px',
               borderRadius: '6px',
               background: 'rgba(30, 41, 59, 0.9)',
               border: '1px solid rgba(148, 163, 184, 0.25)',
               color: '#e2e8f0',
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -396,9 +426,9 @@ export const PdfCanvasViewer = ({
           </button>
           <span
             style={{
-              fontSize: '0.76rem',
+              fontSize: '0.74rem',
               color: '#e2e8f0',
-              minWidth: '48px',
+              minWidth: '42px',
               textAlign: 'center',
               fontVariantNumeric: 'tabular-nums',
               fontWeight: 600,
@@ -413,12 +443,12 @@ export const PdfCanvasViewer = ({
               setScale((s) => Math.min(2.4, Number((s + 0.15).toFixed(2))));
             }}
             style={{
-              padding: '4px 10px',
+              padding: '4px 9px',
               borderRadius: '6px',
               background: 'rgba(30, 41, 59, 0.9)',
               border: '1px solid rgba(148, 163, 184, 0.25)',
               color: '#e2e8f0',
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -433,16 +463,17 @@ export const PdfCanvasViewer = ({
               setScale(1.0);
             }}
             style={{
-              padding: '4px 10px',
+              padding: '4px 9px',
               borderRadius: '6px',
               background: fitWidth ? 'rgba(56, 189, 248, 0.18)' : 'rgba(30, 41, 59, 0.9)',
               border: fitWidth
                 ? '1px solid rgba(56, 189, 248, 0.45)'
                 : '1px solid rgba(148, 163, 184, 0.25)',
               color: '#38bdf8',
-              fontSize: '0.74rem',
+              fontSize: '0.72rem',
               fontWeight: 600,
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
             }}
             title="Fit Page to Width"
           >
@@ -457,7 +488,7 @@ export const PdfCanvasViewer = ({
           flex: 1,
           overflowY: 'auto',
           overflowX: 'auto',
-          padding: compact ? '0.75rem' : '1.25rem 1rem 2rem',
+          padding: compact ? '0.6rem' : 'clamp(0.65rem, 2.5vw, 1.25rem) clamp(0.45rem, 2vw, 1rem) 1.5rem',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',

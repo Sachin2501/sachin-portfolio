@@ -348,7 +348,7 @@ export const ResumeModal = ({ isOpen, onClose }) => {
 
         {/* Modal Footer */}
         <div
-          className="modal-footer"
+          className="modal-footer resume-modal-footer"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -359,7 +359,7 @@ export const ResumeModal = ({ isOpen, onClose }) => {
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: '0.84rem', opacity: 0.85 }}>
+          <span className="resume-footer-verified" style={{ fontSize: '0.84rem', opacity: 0.85 }}>
             <i
               className="fas fa-check-circle"
               style={{ color: '#10b981', marginRight: '6px' }}
@@ -367,18 +367,18 @@ export const ResumeModal = ({ isOpen, onClose }) => {
             Verified Curriculum Vitae • Sachin Kumar
           </span>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="resume-footer-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <a
               href={downloadHref}
               download="Sachin_Kumar_Resume.pdf"
-              className="btn"
+              className="btn resume-footer-btn"
               style={{
                 padding: '9px 22px',
                 fontSize: '0.9rem',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '8px',
-                width: 'auto',
                 borderRadius: '50px',
               }}
             >
@@ -387,15 +387,17 @@ export const ResumeModal = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-outline"
+              className="btn btn-outline resume-footer-btn"
               style={{
                 padding: '9px 20px',
                 fontSize: '0.9rem',
                 background: 'rgba(148, 163, 184, 0.15)',
                 color: 'inherit',
                 border: '1px solid rgba(148, 163, 184, 0.35)',
-                width: 'auto',
                 borderRadius: '50px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               Close
