@@ -5,6 +5,7 @@ import { portfolioRouter } from './routes/portfolio.js';
 import { statsRouter } from './routes/stats.js';
 import { authRouter } from './routes/auth.js';
 import { auditLogsRouter } from './routes/auditLogs.js';
+import { githubRouter } from './routes/github.js';
 import {
   globalApiLimiter,
   contactRateLimiter,
@@ -31,7 +32,8 @@ app.use('/api/auth', authRateLimiter, authRouter);
 app.use('/api/analytics/track', analyticsRateLimiter);
 app.use('/api/mongo/connect', authRateLimiter);
 
-// 3. Mount portfolio, stats, and audit-logs routers
+// 3. Mount portfolio, stats, github, and audit-logs routers
+app.use('/api/github', githubRouter);
 app.use('/api', portfolioRouter);
 app.use('/api', statsRouter);
 app.use('/api/audit-logs', auditLogsRouter);

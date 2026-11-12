@@ -32,8 +32,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, '../../data-storage');
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch {
+  // Read-only filesystem in serverless environments (e.g., Vercel); uses memoryCache + MongoDB Atlas
 }
 
 const DELETED_REGISTRY_PATH = path.join(DATA_DIR, 'deleted_ids.json');

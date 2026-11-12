@@ -1,15 +1,28 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { initializeFirestore, setLogLevel } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+
+// Silence internal @firebase/firestore WebChannel timeout logs since data is served by the Node.js + MongoDB backend
+try {
+  setLogLevel('silent');
+} catch {
+  // ignore
+}
 
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with designated database ID (CRITICAL)
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Lazy/long-polling safe Firestore instance (kept exported for compatibility without eager network pings)
+export const db = initializeFirestore(
+  app,
+  {
+    experimentalAutoDetectLongPolling: true,
+  },
+  firebaseConfig.firestoreDatabaseId
+);
 
-// Initialize Authentication
+// Initialize Authentication (used for Admin Google Sign-In)
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -43,18 +56,7 @@ export function handleFirestoreError(error, operationType, path = null) {
     operationType,
     path,
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  console.warn('Firestore Notice: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Connection test on boot
-export async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline. Verify network connection.');
-    }
-  }
-}
-testConnection();

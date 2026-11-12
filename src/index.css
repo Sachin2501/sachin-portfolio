@@ -4444,8 +4444,11 @@ body.dark-mode .github-profile-link-btn {
 /* Two Column Layout */
 .github-content-layout {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 2rem;
+  width: 100%;
+  max-width: 100%;
+  align-items: start;
 }
 
 .github-activity-column,
@@ -4453,6 +4456,9 @@ body.dark-mode .github-profile-link-btn {
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .github-column-header {
@@ -4859,28 +4865,19 @@ body.dark-mode .heatmap-header-stat {
 
 .github-heatmap-container {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  overflow: visible;
   padding: 4px 0;
-  scrollbar-width: thin;
-}
-
-.github-heatmap-container::-webkit-scrollbar {
-  height: 4px;
-}
-
-.github-heatmap-container::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
 }
 
 .github-heatmap-grid {
   display: grid;
-  grid-template-columns: repeat(14, 1fr);
-  gap: 5px;
-  padding: 0.5rem 0;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: clamp(3px, 0.55vw, 5px);
+  padding: 0.45rem 0;
   position: relative;
-  min-width: 260px;
+  width: 100%;
+  min-width: 0;
 }
 
 .github-heatmap-cell {
@@ -4910,28 +4907,38 @@ body.dark-mode .github-heatmap-cell:focus {
   box-shadow: 0 4px 12px rgba(96, 165, 250, 0.5);
 }
 
-/* Floating Heatmap Tooltip */
+/* High-Contrast Custom Heatmap Hover Tooltip (Light & Dark Mode Adaptive) */
 .github-heatmap-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
   background: #0f172a;
   color: #f8fafc;
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 8px 13px;
+  border-radius: 9px;
   font-size: 0.8rem;
   pointer-events: none;
-  z-index: 100;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 120;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.32), 0 2px 6px rgba(15, 23, 42, 0.18);
+  border: 1.5px solid #334155;
   white-space: nowrap;
-  text-align: center;
-  animation: tooltipFloat 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: tooltipFloat 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+body.dark-mode .github-heatmap-tooltip {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 @keyframes tooltipFloat {
   from {
     opacity: 0;
-    transform: translate(-50%, -85%) scale(0.95);
+    transform: translate(-50%, -88%) scale(0.95);
   }
   to {
     opacity: 1;
@@ -4939,17 +4946,51 @@ body.dark-mode .github-heatmap-cell:focus {
   }
 }
 
+.github-heatmap-tooltip .tooltip-count-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.github-heatmap-tooltip .tooltip-level-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2.5px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+body.dark-mode .github-heatmap-tooltip .tooltip-level-dot {
+  border-color: rgba(15, 23, 42, 0.2);
+}
+
+.github-heatmap-tooltip .tooltip-level-dot.level-0 { background-color: #64748b; }
+.github-heatmap-tooltip .tooltip-level-dot.level-1 { background-color: #4ade80; }
+.github-heatmap-tooltip .tooltip-level-dot.level-2 { background-color: #22c55e; }
+.github-heatmap-tooltip .tooltip-level-dot.level-3 { background-color: #16a34a; }
+.github-heatmap-tooltip .tooltip-level-dot.level-4 { background-color: #15803d; }
+
 .github-heatmap-tooltip .tooltip-count {
   font-weight: 700;
   color: #38bdf8;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   line-height: 1.2;
+  letter-spacing: 0.1px;
+}
+
+body.dark-mode .github-heatmap-tooltip .tooltip-count {
+  color: #0284c7;
 }
 
 .github-heatmap-tooltip .tooltip-date {
-  font-size: 0.72rem;
-  color: #cbd5e1;
-  margin-top: 2px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  line-height: 1.25;
+}
+
+body.dark-mode .github-heatmap-tooltip .tooltip-date {
+  color: #334155;
 }
 
 .github-heatmap-tooltip .tooltip-arrow {
@@ -4957,10 +4998,15 @@ body.dark-mode .github-heatmap-cell:focus {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border-width: 5px 5px 0 5px;
+  border-width: 6px 6px 0 6px;
   border-style: solid;
   border-color: #0f172a transparent transparent transparent;
 }
+
+body.dark-mode .github-heatmap-tooltip .tooltip-arrow {
+  border-color: #f8fafc transparent transparent transparent;
+}
+
 
 .github-heatmap-cell.level-0 {
   background-color: #ebedf0;
@@ -5039,6 +5085,31 @@ body.dark-mode .github-heatmap-cell.level-4 {
   text-decoration: underline;
 }
 
+@media (max-width: 1180px) {
+  .github-profile-card {
+    padding: 1.5rem 1.4rem;
+    gap: 1.25rem;
+  }
+
+  .github-profile-main {
+    flex: 1 1 300px;
+  }
+
+  .github-stats-grid {
+    gap: 0.85rem;
+  }
+
+  .github-stat-box {
+    padding: 0.7rem 1rem;
+    min-width: 88px;
+  }
+
+  .github-content-layout {
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+}
+
 @media (max-width: 968px) {
   .github-content-layout {
     grid-template-columns: 1fr;
@@ -5048,7 +5119,7 @@ body.dark-mode .github-heatmap-cell.level-4 {
   .github-profile-card {
     flex-direction: column;
     align-items: stretch;
-    gap: 1.3rem;
+    gap: 1.25rem;
     padding: 1.5rem;
   }
 
@@ -5057,9 +5128,13 @@ body.dark-mode .github-heatmap-cell.level-4 {
     width: 100%;
   }
 
+  .github-bio {
+    max-width: 100%;
+  }
+
   .github-stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
     gap: 0.8rem;
   }
@@ -5071,15 +5146,23 @@ body.dark-mode .github-heatmap-cell.level-4 {
 
   .github-card-actions {
     width: 100%;
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.8rem;
   }
 
   .github-profile-link-btn,
   .github-refresh-btn {
-    flex: 1;
+    width: 100%;
     justify-content: center;
     text-align: center;
+  }
+
+  /* 2-column repository grid on tablets (640px - 968px) */
+  .github-repos-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
   }
 }
 
@@ -5329,24 +5412,20 @@ body.dark-mode .github-heatmap-cell.level-4 {
 
   .github-filter-pills {
     width: 100%;
-    display: flex;
-    gap: 0.35rem;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    padding-bottom: 4px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .github-filter-pills::-webkit-scrollbar {
-    display: none;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding-bottom: 2px;
   }
 
   .github-filter-pill {
-    padding: 0.32rem 0.7rem;
+    padding: 0.42rem 0.35rem;
     font-size: 0.78rem;
-    flex-shrink: 0;
+    text-align: center;
+    justify-content: center;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .github-timeline {
@@ -5370,6 +5449,7 @@ body.dark-mode .github-heatmap-cell.level-4 {
   .github-timeline-header {
     gap: 0.35rem;
     margin-bottom: 0.3rem;
+    flex-wrap: wrap;
   }
 
   .github-event-type-badge {
@@ -5391,7 +5471,7 @@ body.dark-mode .github-heatmap-cell.level-4 {
   .github-branch-tag {
     font-size: 0.76rem;
     padding: 0.1rem 0.4rem;
-    max-width: 150px;
+    max-width: 160px;
     display: inline-block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -5400,7 +5480,7 @@ body.dark-mode .github-heatmap-cell.level-4 {
 
   .github-commits-list {
     padding: 0.45rem 0.65rem;
-    gap: 0.2rem;
+    gap: 0.25rem;
   }
 
   .github-commit-item {
@@ -5414,9 +5494,11 @@ body.dark-mode .github-heatmap-cell.level-4 {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    word-break: break-word;
   }
 
   .github-repos-list {
+    grid-template-columns: 1fr;
     gap: 0.8rem;
   }
 
@@ -5475,7 +5557,20 @@ body.dark-mode .github-heatmap-cell.level-4 {
 
   .github-heatmap-grid {
     gap: 4px;
-    min-width: 280px;
+    min-width: 0;
+  }
+
+  .github-heatmap-tooltip {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  .github-heatmap-tooltip .tooltip-count {
+    font-size: 0.78rem;
+  }
+
+  .github-heatmap-tooltip .tooltip-date {
+    font-size: 0.68rem;
   }
 
   .github-heatmap-legend {
@@ -5623,17 +5718,19 @@ body.dark-mode .github-heatmap-cell.level-4 {
 
   /* GitHub Contributions 480px Mobile Layout */
   .github-profile-card {
-    padding: 1rem 0.8rem;
+    padding: 1.05rem 0.85rem;
     gap: 0.9rem;
   }
 
   .github-profile-main {
     gap: 0.85rem;
+    align-items: flex-start;
   }
 
   .github-avatar {
     width: 56px;
     height: 56px;
+    flex-shrink: 0;
   }
 
   .github-user-names h3 {
@@ -5649,11 +5746,11 @@ body.dark-mode .github-heatmap-cell.level-4 {
   }
 
   .github-stats-grid {
-    gap: 0.35rem;
+    gap: 0.4rem;
   }
 
   .github-stat-box {
-    padding: 0.5rem 0.25rem;
+    padding: 0.55rem 0.25rem;
   }
 
   .github-stat-num {
@@ -5661,45 +5758,58 @@ body.dark-mode .github-heatmap-cell.level-4 {
   }
 
   .github-stat-label {
-    font-size: 0.62rem;
-    letter-spacing: 0.2px;
+    font-size: 0.61rem;
+    letter-spacing: 0.15px;
   }
 
   .github-card-actions {
-    flex-direction: column;
-    gap: 0.45rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
     width: 100%;
   }
 
   .github-refresh-btn,
   .github-profile-link-btn {
     width: 100%;
-    padding: 0.58rem 0.75rem;
+    padding: 0.62rem 0.65rem;
     font-size: 0.82rem;
   }
 
+  .github-filter-pills {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.38rem;
+  }
+
+  .github-filter-pill {
+    padding: 0.44rem 0.5rem;
+    font-size: 0.76rem;
+  }
+
   .github-timeline {
-    max-height: 420px;
+    max-height: 430px;
   }
 
   .github-timeline-item {
-    padding: 0.8rem 0.75rem;
-    gap: 0.6rem;
+    padding: 0.82rem 0.78rem;
+    gap: 0.65rem;
   }
 
   .github-branch-tag {
-    max-width: 120px;
+    max-width: 130px;
   }
 
   .github-heatmap-grid {
     gap: 3px;
-    min-width: 250px;
+    min-width: 0;
   }
 
   .github-matrix-footer {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.35rem;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
   }
 
   .github-graph-link {
@@ -5774,16 +5884,20 @@ body.dark-mode .github-heatmap-cell.level-4 {
   }
 
   .github-stat-num {
-    font-size: 1.05rem;
+    font-size: 1.02rem;
   }
 
   .github-stat-label {
-    font-size: 0.58rem;
+    font-size: 0.56rem;
+  }
+
+  .github-card-actions {
+    grid-template-columns: 1fr;
   }
 
   .github-heatmap-grid {
     gap: 2.5px;
-    min-width: 230px;
+    min-width: 0;
   }
 }
 
