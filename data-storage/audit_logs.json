@@ -1,128 +1,5 @@
 [
   {
-    "id": "audit_1794408383587_9hnxwc",
-    "timestamp": "2026-11-11T14:46:23.587Z",
-    "action": "DELETE",
-    "collectionName": "messages",
-    "targetId": "msg_1",
-    "targetTitle": "Emily Davis — Senior AI Engineer Opportunity",
-    "changedBy": {
-      "username": "admin",
-      "email": "sachinkumar.gheura@gmail.com",
-      "name": "Sachin Kumar (Admin)",
-      "role": "admin",
-      "userId": "admin_default"
-    },
-    "diff": {
-      "before": {
-        "_id": "msg_1",
-        "id": "msg_1",
-        "name": "Emily Davis",
-        "email": "emily.davis@techventures.io",
-        "subject": "Senior AI Engineer Opportunity",
-        "message": "Hi Sachin, we were deeply impressed by your ML and Full-Stack background. Would love to connect for a quick intro call.",
-        "timestamp": "2026-11-08T15:31:44.719Z",
-        "status": "read",
-        "createdAt": "2026-11-10T15:31:44.719Z",
-        "updatedAt": "2026-11-10T15:31:44.719Z"
-      },
-      "after": null,
-      "modifiedFields": []
-    },
-    "metadata": {
-      "ipAddress": "127.0.0.1",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
-      "method": "DELETE",
-      "endpoint": "/api/contact/messages/msg_1"
-    },
-    "_id": "audit_1794408383587_9hnxwc",
-    "createdAt": "2026-11-11T14:46:23.587Z",
-    "updatedAt": "2026-11-11T14:46:23.587Z"
-  },
-  {
-    "id": "audit_1794408355714_b5ki9s",
-    "timestamp": "2026-11-11T14:45:55.714Z",
-    "action": "CREATE",
-    "collectionName": "messages",
-    "targetId": "msg_1794408355621_fjfjy",
-    "targetTitle": "Aman sharma — Hello from your Portfolio!",
-    "changedBy": {
-      "username": "admin",
-      "email": "sachinkumar.gheura@gmail.com",
-      "name": "Sachin Kumar (Admin)",
-      "role": "admin",
-      "userId": "admin_default"
-    },
-    "diff": {
-      "before": null,
-      "after": {
-        "id": "msg_1794408355621_fjfjy",
-        "name": "Aman sharma",
-        "email": "aman@gmail.com",
-        "subject": "Hello from your Portfolio!",
-        "message": "Hii, just a testing purpose.",
-        "inquiryType": "general",
-        "emailSent": true,
-        "timestamp": "2026-11-11T14:45:55.621Z",
-        "createdAt": "2026-11-11T14:45:55.621Z",
-        "status": "unread",
-        "_id": "msg_1794408355621_fjfjy",
-        "updatedAt": "2026-11-11T14:45:55.621Z"
-      },
-      "modifiedFields": []
-    },
-    "metadata": {
-      "ipAddress": "127.0.0.1",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
-      "method": "POST",
-      "endpoint": "/api/contact"
-    },
-    "_id": "audit_1794408355714_b5ki9s",
-    "createdAt": "2026-11-11T14:45:55.715Z",
-    "updatedAt": "2026-11-11T14:45:55.715Z"
-  },
-  {
-    "id": "audit_1794408000131_b43tuo",
-    "timestamp": "2026-11-11T14:40:00.131Z",
-    "action": "DELETE",
-    "collectionName": "messages",
-    "targetId": "msg_2",
-    "targetTitle": "Rahul Sharma — Consulting on Distributed Systems",
-    "changedBy": {
-      "username": "admin",
-      "email": "sachinkumar.gheura@gmail.com",
-      "name": "Sachin Kumar (Admin)",
-      "role": "admin",
-      "userId": "admin_default"
-    },
-    "diff": {
-      "before": {
-        "_id": "msg_2",
-        "id": "msg_2",
-        "name": "Rahul Sharma",
-        "email": "rahul.s@cloudscale.dev",
-        "subject": "Consulting on Distributed Systems",
-        "message": "Hey Sachin! Loved your projects on GitHub. Are you available for contract or consulting work in Q2?",
-        "timestamp": "2026-11-09T15:31:44.719Z",
-        "status": "read",
-        "createdAt": "2026-11-10T15:31:44.719Z",
-        "updatedAt": "2026-11-11T14:38:36.041Z",
-        "readAt": "2026-11-11T14:38:36.040Z"
-      },
-      "after": null,
-      "modifiedFields": []
-    },
-    "metadata": {
-      "ipAddress": "127.0.0.1",
-      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
-      "method": "DELETE",
-      "endpoint": "/api/contact/messages/msg_2"
-    },
-    "_id": "audit_1794408000131_b43tuo",
-    "createdAt": "2026-11-11T14:40:00.132Z",
-    "updatedAt": "2026-11-11T14:40:00.132Z"
-  },
-  {
     "_id": "audit_1794398920867_sio033",
     "id": "audit_1794398920867_sio033",
     "timestamp": "2026-11-11T12:08:40.867Z",
@@ -3999,5 +3876,128 @@
     },
     "createdAt": "2026-11-11T11:38:16.763Z",
     "updatedAt": "2026-11-11T11:38:16.763Z"
+  },
+  {
+    "id": "audit_1794408000131_b43tuo",
+    "timestamp": "2026-11-11T14:40:00.131Z",
+    "action": "DELETE",
+    "collectionName": "messages",
+    "targetId": "msg_2",
+    "targetTitle": "Rahul Sharma — Consulting on Distributed Systems",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "msg_2",
+        "id": "msg_2",
+        "name": "Rahul Sharma",
+        "email": "rahul.s@cloudscale.dev",
+        "subject": "Consulting on Distributed Systems",
+        "message": "Hey Sachin! Loved your projects on GitHub. Are you available for contract or consulting work in Q2?",
+        "timestamp": "2026-11-09T15:31:44.719Z",
+        "status": "read",
+        "createdAt": "2026-11-10T15:31:44.719Z",
+        "updatedAt": "2026-11-11T14:38:36.041Z",
+        "readAt": "2026-11-11T14:38:36.040Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/contact/messages/msg_2"
+    },
+    "_id": "audit_1794408000131_b43tuo",
+    "createdAt": "2026-11-11T14:40:00.132Z",
+    "updatedAt": "2026-11-11T14:40:00.132Z"
+  },
+  {
+    "id": "audit_1794408355714_b5ki9s",
+    "timestamp": "2026-11-11T14:45:55.714Z",
+    "action": "CREATE",
+    "collectionName": "messages",
+    "targetId": "msg_1794408355621_fjfjy",
+    "targetTitle": "Aman sharma — Hello from your Portfolio!",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": null,
+      "after": {
+        "id": "msg_1794408355621_fjfjy",
+        "name": "Aman sharma",
+        "email": "aman@gmail.com",
+        "subject": "Hello from your Portfolio!",
+        "message": "Hii, just a testing purpose.",
+        "inquiryType": "general",
+        "emailSent": true,
+        "timestamp": "2026-11-11T14:45:55.621Z",
+        "createdAt": "2026-11-11T14:45:55.621Z",
+        "status": "unread",
+        "_id": "msg_1794408355621_fjfjy",
+        "updatedAt": "2026-11-11T14:45:55.621Z"
+      },
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "POST",
+      "endpoint": "/api/contact"
+    },
+    "_id": "audit_1794408355714_b5ki9s",
+    "createdAt": "2026-11-11T14:45:55.715Z",
+    "updatedAt": "2026-11-11T14:45:55.715Z"
+  },
+  {
+    "id": "audit_1794408383587_9hnxwc",
+    "timestamp": "2026-11-11T14:46:23.587Z",
+    "action": "DELETE",
+    "collectionName": "messages",
+    "targetId": "msg_1",
+    "targetTitle": "Emily Davis — Senior AI Engineer Opportunity",
+    "changedBy": {
+      "username": "admin",
+      "email": "sachinkumar.gheura@gmail.com",
+      "name": "Sachin Kumar (Admin)",
+      "role": "admin",
+      "userId": "admin_default"
+    },
+    "diff": {
+      "before": {
+        "_id": "msg_1",
+        "id": "msg_1",
+        "name": "Emily Davis",
+        "email": "emily.davis@techventures.io",
+        "subject": "Senior AI Engineer Opportunity",
+        "message": "Hi Sachin, we were deeply impressed by your ML and Full-Stack background. Would love to connect for a quick intro call.",
+        "timestamp": "2026-11-08T15:31:44.719Z",
+        "status": "read",
+        "createdAt": "2026-11-10T15:31:44.719Z",
+        "updatedAt": "2026-11-10T15:31:44.719Z"
+      },
+      "after": null,
+      "modifiedFields": []
+    },
+    "metadata": {
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "method": "DELETE",
+      "endpoint": "/api/contact/messages/msg_1"
+    },
+    "_id": "audit_1794408383587_9hnxwc",
+    "createdAt": "2026-11-11T14:46:23.587Z",
+    "updatedAt": "2026-11-11T14:46:23.587Z"
   }
 ]
