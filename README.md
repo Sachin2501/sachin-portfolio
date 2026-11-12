@@ -1,6 +1,6 @@
 # Sachin Kumar - Portfolio Website (React + JavaScript)
 
-![Portfolio Preview](/images/My_portfolio.png)
+![Portfolio Preview](public/images/My_portfolio.png)
 
 A modern, responsive portfolio website for **Sachin Kumar**, Software Engineer & AI/ML Developer, built with **React 18**, **JavaScript (ESNext / JSX)**, and **Vite**.
 
