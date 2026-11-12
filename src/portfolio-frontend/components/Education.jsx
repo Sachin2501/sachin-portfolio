@@ -86,54 +86,45 @@ export const Education = () => {
                       : [];
 
                     return (
-                      <div key={edu.id || edu._id} className="experience-card-item">
+                      <div key={edu.id || edu._id} className="experience-card-item education-card-item">
                         <div className="experience-card-top">
                           <div className="experience-card-header">
                             <h3>{edu.degree}</h3>
                             <div className="experience-company-row">
-                              <i className="fas fa-university" style={{ color: '#10b981' }}></i>
+                              <i className="fas fa-university edu-univ-icon"></i>
                               <span className="issuer">{edu.institute || edu.institution}</span>
                             </div>
                           </div>
                           <span className="date">{edu.duration || edu.period}</span>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', margin: '0.8rem 0', flexWrap: 'wrap' }}>
-                          {edu.grade && (
-                            <span className="grade" style={{ background: 'rgba(16, 185, 129, 0.12)', padding: '0.25rem 0.75rem', borderRadius: '15px' }}>
-                              <i className="fas fa-award" style={{ marginRight: '5px' }}></i>
-                              {edu.grade}
-                            </span>
-                          )}
-                          {edu.status && (
-                            <span
-                              style={{
-                                fontSize: '0.82rem',
-                                fontWeight: 600,
-                                color: '#3b82f6',
-                                background: 'rgba(59, 130, 246, 0.12)',
-                                padding: '0.25rem 0.75rem',
-                                borderRadius: '15px',
-                              }}
-                            >
-                              <i className="fas fa-circle-check" style={{ marginRight: '5px' }}></i>
-                              {edu.status}
-                            </span>
-                          )}
-                        </div>
+                        {(edu.grade || edu.status) && (
+                          <div className="edu-meta-badges">
+                            {edu.grade && (
+                              <span className="grade edu-grade-badge">
+                                <i className="fas fa-award"></i>
+                                <span>{edu.grade}</span>
+                              </span>
+                            )}
+                            {edu.status && (
+                              <span className="edu-status-badge">
+                                <i className="fas fa-circle-check"></i>
+                                <span>{edu.status}</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         {highlightsList.length > 0 && (
-                          <ul className="experience-details" style={{ margin: '1rem 0', paddingLeft: '1.2rem' }}>
+                          <ul className="experience-details">
                             {highlightsList.map((h, i) => (
-                              <li key={i} style={{ marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                                {h}
-                              </li>
+                              <li key={i}>{h}</li>
                             ))}
                           </ul>
                         )}
 
                         {skillsList.length > 0 && (
-                          <div className="tech-used" style={{ marginTop: 'auto', marginBottom: '0.8rem' }}>
+                          <div className="tech-used edu-tech-used">
                             {skillsList.map((skill) => (
                               <span key={skill} className="tech-tag">
                                 {skill}
@@ -142,18 +133,10 @@ export const Education = () => {
                           </div>
                         )}
 
-                        <div className="experience-card-action" style={{ paddingTop: '0.8rem', borderTop: '1px solid var(--border-color)' }}>
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.4rem',
-                              color: '#10b981',
-                              fontWeight: 600,
-                              fontSize: '0.88rem',
-                            }}
-                          >
-                            <i className="fas fa-certificate"></i> Verified Degree Program
+                        <div className="experience-card-action edu-card-footer">
+                          <div className="edu-verified-badge">
+                            <i className="fas fa-certificate"></i>
+                            <span>Verified Degree Program</span>
                           </div>
                         </div>
                       </div>

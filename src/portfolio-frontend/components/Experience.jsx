@@ -101,17 +101,15 @@ export const Experience = ({ onSelectCertificate }) => {
                         </div>
 
                         {detailsList.length > 0 && (
-                          <ul className="experience-details" style={{ margin: '1rem 0', paddingLeft: '1.2rem' }}>
+                          <ul className="experience-details exp-details-list">
                             {detailsList.map((detail, idx) => (
-                              <li key={idx} style={{ marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                                {detail}
-                              </li>
+                              <li key={idx}>{detail}</li>
                             ))}
                           </ul>
                         )}
 
                         {techList.length > 0 && (
-                          <div className="tech-used" style={{ marginTop: 'auto', marginBottom: '1.2rem' }}>
+                          <div className="tech-used exp-tech-used">
                             {techList.map((tag) => (
                               <span key={tag} className="tech-tag">
                                 {tag}
@@ -121,7 +119,7 @@ export const Experience = ({ onSelectCertificate }) => {
                         )}
 
                         {exp.certificate && onSelectCertificate && (
-                          <div className="experience-card-action" style={{ paddingTop: '0.8rem', borderTop: '1px solid var(--border-color)' }}>
+                          <div className="experience-card-action exp-card-footer">
                             <button
                               type="button"
                               className="certificate-view"
