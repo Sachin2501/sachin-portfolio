@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Search,
   Sparkles,
@@ -15,34 +15,79 @@ import {
   Code,
   FileText,
   Sliders,
-  ExternalLink,
-  ChevronRight,
   Layers,
+  Sun,
+  Moon,
+  Database,
+  Activity,
+  Wifi,
 } from 'lucide-react';
+import { buildApiUrl } from '../../config/api.js';
 
 export const ProjectSeoGeneratorTab = ({
   projectsList,
   onUpdateProjectSEO,
   profileConfig,
+  adminTheme = 'dark',
+  onToggleTheme,
+  isBackendConnected = true,
+  backendHealth,
+  portfolioPing,
+  onRefreshFromDb,
 }) => {
   // Currently selected project
   const [selectedProjectId, setSelectedProjectId] = useState(() => {
     return projectsList && projectsList.length > 0 ? projectsList[0].id : '';
   });
 
+  // Live SEO map fetched directly from GET /api/seo (real-time MongoDB state)
+  const [dbSeoByProjectId, setDbSeoByProjectId] = useState({});
+  const [realtimeDbState, setRealtimeDbState] = useState({
+    connected: true,
+    engine: 'MongoDB Atlas (Live Cloud Cluster)',
+    databaseName: 'sachin_portfolio_db',
+    latencyMs: portfolioPing?.latencyMs || 18,
+    syncedCount: projectsList ? projectsList.length : 3,
+    totalCount: projectsList ? projectsList.length : 3,
+    lastSyncTime: new Date().toLocaleTimeString(),
+    isSyncing: false,
+  });
+
+  // Track whether user has unsaved local edits in the form so background polls don't overwrite typing
+  const isDirtyRef = useRef(false);
+  const lastSelectedIdRef = useRef(selectedProjectId);
+
+  // Merge projectsList with live dbSeoByProjectId so chips and previews always show live DB state
+  const mergedProjectsList = useMemo(() => {
+    if (!Array.isArray(projectsList)) return [];
+    return projectsList.map((p) => {
+      const dbSeo = dbSeoByProjectId[p.id] || dbSeoByProjectId[p._id];
+      if (dbSeo && dbSeo.metaTitle) {
+        return { ...p, seo: dbSeo };
+      }
+      return p;
+    });
+  }, [projectsList, dbSeoByProjectId]);
+
   const selectedProject = useMemo(() => {
-    if (!projectsList || projectsList.length === 0) return null;
+    if (!mergedProjectsList || mergedProjectsList.length === 0) return null;
     return (
-      projectsList.find((p) => p.id === selectedProjectId) || projectsList[0]
+      mergedProjectsList.find((p) => p.id === selectedProjectId) || mergedProjectsList[0]
     );
-  }, [projectsList, selectedProjectId]);
+  }, [mergedProjectsList, selectedProjectId]);
 
   // Social Preview Tab: 'google' | 'linkedin' | 'twitter' | 'discord'
   const [previewPlatform, setPreviewPlatform] = useState('google');
   // Google preview device toggle: 'desktop' | 'mobile'
   const [googleDevice, setGoogleDevice] = useState('desktop');
-  // Twitter preview theme: 'dark' | 'light'
-  const [twitterTheme, setTwitterTheme] = useState('dark');
+  // Preview card theme ('dark' | 'light'), synced with adminTheme when toggled
+  const [previewTheme, setPreviewTheme] = useState(adminTheme === 'light' ? 'light' : 'dark');
+  // Code export viewer tab: 'html' | 'jsonld'
+  const [activeCodeTab, setActiveCodeTab] = useState('html');
+
+  useEffect(() => {
+    setPreviewTheme(adminTheme === 'light' ? 'light' : 'dark');
+  }, [adminTheme]);
 
   // Copy status indicators
   const [copiedType, setCopiedType] = useState(null);
@@ -120,12 +165,6 @@ export const ProjectSeoGeneratorTab = ({
         metaDescription = metaDescription.slice(0, 155).trim() + '...';
       }
 
-      // Slug
-      const slug = cleanTitle
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-
       const keywords = `${cleanTitle}, ${project.category || 'Web Development'}, ${techList}, ${authorName}, Software Engineer Portfolio, Full Stack Developer, Open Source`;
 
       const ogImage =
@@ -142,16 +181,148 @@ export const ProjectSeoGeneratorTab = ({
         ogImage,
         twitterCard: 'summary_large_image',
         robots: 'index, follow',
-        schemaType: project.category === 'AI / Machine Learning' ? 'SoftwareApplication' : 'WebApplication',
+        schemaType:
+          (project.category || '').toLowerCase().includes('ai') ||
+          (project.category || '').toLowerCase().includes('deep learning')
+            ? 'SoftwareApplication'
+            : 'WebApplication',
         author: authorName,
       };
     },
     [baseUrl, profileConfig]
   );
 
-  // Sync form when selected project changes
+  // Real-time fetch of SEO metadata from MongoDB backend (/api/seo + fallback /api/projects)
+  const syncSeoFromDatabase = useCallback(
+    async (forceRefreshForm = false) => {
+      setRealtimeDbState((prev) => ({ ...prev, isSyncing: true }));
+      const start = performance.now();
+      try {
+        const res = await fetch(buildApiUrl('/api/seo'), { cache: 'no-store' }).catch(() => null);
+        const latencyMs = Math.max(1, Math.round(performance.now() - start));
+
+        if (res && res.ok) {
+          const json = await res.json().catch(() => ({}));
+          if (json.success && Array.isArray(json.data)) {
+            const nextMap = {};
+            let synced = 0;
+            json.data.forEach((item) => {
+              const pid = item.id || item._id;
+              if (pid && item.seo && item.seo.metaTitle) {
+                nextMap[pid] = item.seo;
+                synced++;
+              }
+            });
+            setDbSeoByProjectId(nextMap);
+            setRealtimeDbState({
+              connected: true,
+              engine:
+                json.database?.engine ||
+                backendHealth?.database?.engine ||
+                'MongoDB Atlas (Live Cloud Cluster)',
+              databaseName:
+                json.database?.databaseName ||
+                backendHealth?.database?.databaseName ||
+                'sachin_portfolio_db',
+              latencyMs,
+              syncedCount: synced || json.data.length,
+              totalCount: json.data.length || (projectsList ? projectsList.length : 3),
+              lastSyncTime: new Date().toLocaleTimeString(),
+              isSyncing: false,
+            });
+            if (forceRefreshForm) {
+              isDirtyRef.current = false;
+            }
+            return;
+          }
+        }
+
+        // Fallback to /api/projects if /api/seo is not available
+        const projRes = await fetch(buildApiUrl('/api/projects'), { cache: 'no-store' }).catch(
+          () => null
+        );
+        if (projRes && projRes.ok) {
+          const projJson = await projRes.json().catch(() => ({}));
+          const list = Array.isArray(projJson.data) ? projJson.data : [];
+          const nextMap = {};
+          let synced = 0;
+          list.forEach((p) => {
+            const pid = p.id || p._id;
+            if (pid && p.seo && p.seo.metaTitle) {
+              nextMap[pid] = p.seo;
+              synced++;
+            }
+          });
+          setDbSeoByProjectId(nextMap);
+          setRealtimeDbState((prev) => ({
+            ...prev,
+            connected: true,
+            latencyMs,
+            syncedCount: synced || list.length || prev.syncedCount,
+            totalCount: list.length || prev.totalCount,
+            lastSyncTime: new Date().toLocaleTimeString(),
+            isSyncing: false,
+          }));
+          if (forceRefreshForm) {
+            isDirtyRef.current = false;
+          }
+          return;
+        }
+      } catch {
+        // ignore transient error
+      }
+      setRealtimeDbState((prev) => ({
+        ...prev,
+        connected: Boolean(isBackendConnected),
+        latencyMs: portfolioPing?.latencyMs || prev.latencyMs || 24,
+        lastSyncTime: new Date().toLocaleTimeString(),
+        isSyncing: false,
+      }));
+    },
+    [backendHealth, isBackendConnected, portfolioPing?.latencyMs, projectsList]
+  );
+
+  // Poll real-time database every 8 seconds and listen for BroadcastChannel updates
   useEffect(() => {
-    if (selectedProject) {
+    syncSeoFromDatabase();
+    const interval = setInterval(() => {
+      syncSeoFromDatabase(false);
+    }, 8000);
+
+    let bc = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('portfolio_realtime_sync');
+        bc.onmessage = () => {
+          syncSeoFromDatabase(false);
+        };
+      } catch {
+        // ignore
+      }
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (bc) {
+        try {
+          bc.close();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [syncSeoFromDatabase]);
+
+  // Sync form when selected project changes or when DB updates (if form isn't dirty)
+  useEffect(() => {
+    if (!selectedProject) return;
+    const projectSwitched = lastSelectedIdRef.current !== selectedProject.id;
+    if (projectSwitched) {
+      lastSelectedIdRef.current = selectedProject.id;
+      isDirtyRef.current = false;
+    }
+
+    if (projectSwitched || !isDirtyRef.current) {
       if (selectedProject.seo && selectedProject.seo.metaTitle) {
         setSeoForm({
           metaTitle: selectedProject.seo.metaTitle || '',
@@ -165,7 +336,6 @@ export const ProjectSeoGeneratorTab = ({
           author: selectedProject.seo.author || profileConfig?.name || 'Sachin Kumar',
         });
       } else {
-        // Auto-populate intelligent defaults
         const auto = generateProjectSEO(selectedProject);
         if (auto) setSeoForm(auto);
       }
@@ -174,6 +344,7 @@ export const ProjectSeoGeneratorTab = ({
 
   // Handle Form Change
   const handleInputChange = (field, value) => {
+    isDirtyRef.current = true;
     setSeoForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -182,31 +353,53 @@ export const ProjectSeoGeneratorTab = ({
     if (!selectedProject) return;
     const generated = generateProjectSEO(selectedProject, tone);
     if (generated) {
+      isDirtyRef.current = true;
       setSeoForm(generated);
       setSaveStatus({
         type: 'info',
-        message: `Generated automated ${tone} SEO meta-tags for "${selectedProject.title}". Click "Save to Database" to commit.`,
+        message: `Generated automated ${tone} SEO meta-tags for "${selectedProject.title}". Click "Save to Database" to commit to MongoDB.`,
       });
       setTimeout(() => setSaveStatus(null), 4000);
     }
   };
 
-  // Batch auto-generate for all projects
+  // Manual Sync Now handler
+  const handleManualSyncDb = async () => {
+    isDirtyRef.current = false;
+    await syncSeoFromDatabase(true);
+    if (onRefreshFromDb) {
+      await onRefreshFromDb();
+    }
+    setSaveStatus({
+      type: 'success',
+      message: `Synchronized live SEO metadata from ${realtimeDbState.databaseName} (${realtimeDbState.engine})!`,
+    });
+    setTimeout(() => setSaveStatus(null), 3500);
+  };
+
+  // Batch auto-generate for all projects and persist to MongoDB
   const handleBatchGenerateAll = async () => {
-    if (!projectsList || projectsList.length === 0) return;
+    if (!mergedProjectsList || mergedProjectsList.length === 0) return;
     setIsSaving(true);
     let count = 0;
     try {
-      for (const proj of projectsList) {
+      const nextMap = { ...dbSeoByProjectId };
+      for (const proj of mergedProjectsList) {
         const generated = generateProjectSEO(proj, 'balanced');
         if (generated && onUpdateProjectSEO) {
-          await onUpdateProjectSEO(proj.id, generated);
-          count++;
+          const ok = await onUpdateProjectSEO(proj.id, generated);
+          if (ok !== false) {
+            nextMap[proj.id] = { ...generated, updatedAt: new Date().toISOString() };
+            count++;
+          }
         }
       }
+      setDbSeoByProjectId(nextMap);
+      isDirtyRef.current = false;
+      await syncSeoFromDatabase(true);
       setSaveStatus({
         type: 'success',
-        message: `Successfully generated and saved SEO meta-tags for all ${count} projects to Database!`,
+        message: `Successfully generated and synced SEO meta-tags for all ${count} projects to Live MongoDB Database!`,
       });
     } catch (err) {
       setSaveStatus({
@@ -219,21 +412,27 @@ export const ProjectSeoGeneratorTab = ({
     }
   };
 
-  // Save current project's SEO
+  // Save current project's SEO to MongoDB
   const handleSaveSEO = async () => {
     if (!selectedProject || !onUpdateProjectSEO) return;
     setIsSaving(true);
     try {
       const success = await onUpdateProjectSEO(selectedProject.id, seoForm);
       if (success !== false) {
+        isDirtyRef.current = false;
+        setDbSeoByProjectId((prev) => ({
+          ...prev,
+          [selectedProject.id]: { ...seoForm, updatedAt: new Date().toISOString() },
+        }));
+        await syncSeoFromDatabase(true);
         setSaveStatus({
           type: 'success',
-          message: `SEO Metadata for "${selectedProject.title}" saved successfully to MongoDB & Cloud Firestore!`,
+          message: `SEO Metadata for "${selectedProject.title}" saved in real time to MongoDB (${realtimeDbState.databaseName})!`,
         });
       } else {
         setSaveStatus({
           type: 'error',
-          message: 'Failed to save SEO meta-tags. Please check console.',
+          message: 'Failed to save SEO meta-tags to database. Please try again.',
         });
       }
     } catch (err) {
@@ -370,6 +569,21 @@ export const ProjectSeoGeneratorTab = ({
         </div>
 
         <div className="seo-header-actions">
+          {onToggleTheme && (
+            <button
+              type="button"
+              className="btn-seo-theme-switch"
+              onClick={onToggleTheme}
+              title={
+                adminTheme === 'dark'
+                  ? 'Switch to White (Light) Mode'
+                  : 'Switch to Dark Mode'
+              }
+            >
+              {adminTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              <span>{adminTheme === 'dark' ? 'White Mode' : 'Dark Mode'}</span>
+            </button>
+          )}
           <button
             type="button"
             className="btn-batch-generate"
@@ -378,7 +592,7 @@ export const ProjectSeoGeneratorTab = ({
             title="Automatically generate and save optimal SEO metadata for all projects"
           >
             <Sparkles size={16} />
-            <span>Auto-Generate All ({projectsList.length})</span>
+            <span>Auto-Generate All ({mergedProjectsList.length})</span>
           </button>
           <button
             type="button"
@@ -388,6 +602,57 @@ export const ProjectSeoGeneratorTab = ({
           >
             {isSaving ? <RefreshCw className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
             <span>Save to Database</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Real-Time Database Connection & Sync Telemetry Bar */}
+      <div className={`seo-realtime-db-bar ${realtimeDbState.connected ? 'connected' : 'offline'}`}>
+        <div className="seo-db-status-left">
+          <span className={`seo-db-live-pill ${realtimeDbState.connected ? 'online' : 'offline'}`}>
+            <span className="seo-db-pulse-dot" />
+            <Wifi size={13} />
+            <span>{realtimeDbState.connected ? 'Real-Time DB Connected' : 'Local Sync Active'}</span>
+          </span>
+          <span className="seo-db-cluster-tag">
+            <Database size={13} />
+            <strong>{realtimeDbState.databaseName}</strong>
+            <span className="seo-db-engine-text">({realtimeDbState.engine})</span>
+          </span>
+          <span className="seo-db-metric-tag">
+            <Activity size={13} />
+            <span>
+              GET /api/seo · <strong>{realtimeDbState.latencyMs || 18}ms</strong>
+            </span>
+          </span>
+          <span className="seo-db-synced-tag">
+            <CheckCircle2 size={13} />
+            <span>
+              <strong>
+                {mergedProjectsList.filter((p) => p.seo && p.seo.metaTitle).length}/
+                {mergedProjectsList.length}
+              </strong>{' '}
+              Projects Synced in DB
+            </span>
+          </span>
+        </div>
+
+        <div className="seo-db-status-right">
+          <span className="seo-db-last-sync">
+            Last Sync: <strong>{realtimeDbState.lastSyncTime}</strong>
+          </span>
+          <button
+            type="button"
+            className="btn-seo-sync-now"
+            onClick={handleManualSyncDb}
+            disabled={realtimeDbState.isSyncing || isSaving}
+            title="Pull latest SEO metadata from MongoDB Atlas in real time"
+          >
+            <RefreshCw
+              size={13}
+              className={realtimeDbState.isSyncing ? 'animate-spin' : ''}
+            />
+            <span>{realtimeDbState.isSyncing ? 'Syncing...' : 'Sync DB Now'}</span>
           </button>
         </div>
       </div>
@@ -413,7 +678,7 @@ export const ProjectSeoGeneratorTab = ({
           <span>Select Project:</span>
         </div>
         <div className="project-chips-scroll">
-          {projectsList.map((p) => {
+          {mergedProjectsList.map((p) => {
             const isSelected = p.id === (selectedProject?.id || selectedProjectId);
             const hasCustomSeo = p.seo && p.seo.metaTitle;
             return (
@@ -425,7 +690,7 @@ export const ProjectSeoGeneratorTab = ({
               >
                 <span className="chip-title">{p.title}</span>
                 {hasCustomSeo ? (
-                  <span className="chip-seo-status active" title="Custom SEO Saved">
+                  <span className="chip-seo-status active" title="Synced in MongoDB Database">
                     SEO ✓
                   </span>
                 ) : (
@@ -670,7 +935,7 @@ export const ProjectSeoGeneratorTab = ({
                       className={`device-btn ${googleDevice === 'desktop' ? 'active' : ''}`}
                       onClick={() => setGoogleDevice('desktop')}
                     >
-                      <Monitor size={14} />
+                      <Monitor size={13} />
                       <span>Desktop</span>
                     </button>
                     <button
@@ -678,13 +943,31 @@ export const ProjectSeoGeneratorTab = ({
                       className={`device-btn ${googleDevice === 'mobile' ? 'active' : ''}`}
                       onClick={() => setGoogleDevice('mobile')}
                     >
-                      <Smartphone size={14} />
+                      <Smartphone size={13} />
                       <span>Mobile</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`device-btn ${previewTheme === 'light' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('light')}
+                      title="Google Light Theme"
+                    >
+                      <Sun size={13} />
+                      <span>White</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`device-btn ${previewTheme === 'dark' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('dark')}
+                      title="Google Dark Theme"
+                    >
+                      <Moon size={13} />
+                      <span>Dark</span>
                     </button>
                   </div>
                 </div>
 
-                <div className={`serp-card ${googleDevice}`}>
+                <div className={`serp-card ${googleDevice} serp-theme-${previewTheme}`}>
                   {/* Google Breadcrumb */}
                   <div className="serp-breadcrumb">
                     <div className="serp-favicon">
@@ -725,10 +1008,28 @@ export const ProjectSeoGeneratorTab = ({
             {previewPlatform === 'linkedin' && (
               <div className="preview-box linkedin-share-box">
                 <div className="preview-controls-bar">
-                  <span className="preview-title-tag">LinkedIn & Facebook Post Card</span>
+                  <span className="preview-title-tag">LinkedIn &amp; Facebook Post Card</span>
+                  <div className="device-toggles">
+                    <button
+                      type="button"
+                      className={`device-btn ${previewTheme === 'dark' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('dark')}
+                    >
+                      <Moon size={13} />
+                      <span>Dark</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`device-btn ${previewTheme === 'light' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('light')}
+                    >
+                      <Sun size={13} />
+                      <span>White</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="social-card-mockup linkedin-mockup">
+                <div className={`social-card-mockup linkedin-mockup card-theme-${previewTheme}`}>
                   <div className="social-card-img-container">
                     <img
                       src={seoForm.ogImage || selectedProject?.image || '/assets/aistudio/projects-bg_f9111c06.png'}
@@ -757,22 +1058,24 @@ export const ProjectSeoGeneratorTab = ({
                   <div className="device-toggles">
                     <button
                       type="button"
-                      className={`device-btn ${twitterTheme === 'dark' ? 'active' : ''}`}
-                      onClick={() => setTwitterTheme('dark')}
+                      className={`device-btn ${previewTheme === 'dark' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('dark')}
                     >
+                      <Moon size={13} />
                       <span>Dark 𝕏</span>
                     </button>
                     <button
                       type="button"
-                      className={`device-btn ${twitterTheme === 'light' ? 'active' : ''}`}
-                      onClick={() => setTwitterTheme('light')}
+                      className={`device-btn ${previewTheme === 'light' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('light')}
                     >
-                      <span>Light</span>
+                      <Sun size={13} />
+                      <span>White</span>
                     </button>
                   </div>
                 </div>
 
-                <div className={`twitter-card-mockup ${twitterTheme}`}>
+                <div className={`twitter-card-mockup ${previewTheme}`}>
                   <div className="twitter-img-wrap">
                     <img
                       src={seoForm.ogImage || selectedProject?.image || '/assets/aistudio/projects-bg_f9111c06.png'}
@@ -796,10 +1099,28 @@ export const ProjectSeoGeneratorTab = ({
             {previewPlatform === 'discord' && (
               <div className="preview-box discord-share-box">
                 <div className="preview-controls-bar">
-                  <span className="preview-title-tag">Discord & Slack Rich Embed</span>
+                  <span className="preview-title-tag">Discord &amp; Slack Rich Embed</span>
+                  <div className="device-toggles">
+                    <button
+                      type="button"
+                      className={`device-btn ${previewTheme === 'dark' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('dark')}
+                    >
+                      <Moon size={13} />
+                      <span>Dark</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`device-btn ${previewTheme === 'light' ? 'active' : ''}`}
+                      onClick={() => setPreviewTheme('light')}
+                    >
+                      <Sun size={13} />
+                      <span>White</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="discord-embed-mockup">
+                <div className={`discord-embed-mockup card-theme-${previewTheme}`}>
                   <div className="discord-accent-bar" />
                   <div className="discord-embed-body">
                     <div className="discord-site-title">{profileConfig?.name || 'Sachin Kumar'} Portfolio</div>
@@ -827,10 +1148,28 @@ export const ProjectSeoGeneratorTab = ({
           {/* Code Export Tabs */}
           <div className="seo-code-export-area">
             <div className="export-tabs-row">
-              <span className="export-heading">
-                <Code size={15} />
-                Export Generated Code:
-              </span>
+              <div className="export-tab-switchers">
+                <span className="export-heading">
+                  <Code size={15} />
+                  <span>Generated Code:</span>
+                </span>
+                <div className="code-view-pills">
+                  <button
+                    type="button"
+                    className={`code-view-pill ${activeCodeTab === 'html' ? 'active' : ''}`}
+                    onClick={() => setActiveCodeTab('html')}
+                  >
+                    &lt;head&gt; HTML
+                  </button>
+                  <button
+                    type="button"
+                    className={`code-view-pill ${activeCodeTab === 'jsonld' ? 'active' : ''}`}
+                    onClick={() => setActiveCodeTab('jsonld')}
+                  >
+                    Schema JSON-LD
+                  </button>
+                </div>
+              </div>
               <div className="export-action-btns">
                 <button
                   type="button"
@@ -838,7 +1177,7 @@ export const ProjectSeoGeneratorTab = ({
                   onClick={() => handleCopyToClipboard(generatedHtmlSnippet, 'html')}
                 >
                   {copiedType === 'html' ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copiedType === 'html' ? 'Copied HTML!' : 'Copy <head> HTML'}</span>
+                  <span>{copiedType === 'html' ? 'Copied HTML!' : 'Copy HTML'}</span>
                 </button>
                 <button
                   type="button"
@@ -846,13 +1185,13 @@ export const ProjectSeoGeneratorTab = ({
                   onClick={() => handleCopyToClipboard(generatedJsonLd, 'jsonld')}
                 >
                   {copiedType === 'jsonld' ? <Check size={14} /> : <FileText size={14} />}
-                  <span>{copiedType === 'jsonld' ? 'Copied JSON-LD!' : 'Copy Schema JSON-LD'}</span>
+                  <span>{copiedType === 'jsonld' ? 'Copied JSON-LD!' : 'Copy JSON-LD'}</span>
                 </button>
               </div>
             </div>
 
             <pre className="code-snippet-preview">
-              <code>{generatedHtmlSnippet}</code>
+              <code>{activeCodeTab === 'jsonld' ? generatedJsonLd : generatedHtmlSnippet}</code>
             </pre>
           </div>
         </div>

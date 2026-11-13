@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 
 // Initial Data Seeds
 import { projects as initialProjects } from '../../src/data/projects.js';
@@ -58,6 +58,66 @@ function saveDeletedRegistry(reg) {
   } catch {}
 }
 
+function toSafeObjectId(val) {
+  if (!val) return null;
+  const str = String(val).trim();
+  if (/^[0-9a-fA-F]{24}$/.test(str) && ObjectId.isValid(str)) {
+    try {
+      return new ObjectId(str);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function buildMongoOrFilter(rawIds = [], extraFields = {}) {
+  const strIds = new Set();
+  const numIds = new Set();
+  const objIds = [];
+
+  for (const raw of rawIds) {
+    if (raw === undefined || raw === null) continue;
+    const s = String(raw).trim();
+    if (!s) continue;
+    strIds.add(s);
+    try {
+      const dec = decodeURIComponent(s).trim();
+      if (dec) strIds.add(dec);
+    } catch {}
+  }
+
+  for (const s of strIds) {
+    if (!Number.isNaN(Number(s)) && String(Number(s)) === s) {
+      numIds.add(Number(s));
+    }
+    const oid = toSafeObjectId(s);
+    if (oid) objIds.push(oid);
+  }
+
+  const orConditions = [];
+  const strArr = Array.from(strIds);
+  const numArr = Array.from(numIds);
+
+  if (strArr.length > 0) {
+    orConditions.push({ _id: { $in: strArr } }, { id: { $in: strArr } });
+  }
+  if (numArr.length > 0) {
+    orConditions.push({ _id: { $in: numArr } }, { id: { $in: numArr } });
+  }
+  if (objIds.length > 0) {
+    orConditions.push({ _id: { $in: objIds } });
+  }
+
+  for (const [field, val] of Object.entries(extraFields)) {
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      orConditions.push({ [field]: String(val).trim() });
+    }
+  }
+
+  return orConditions.length > 0 ? { $or: orConditions } : null;
+}
+
 function deduplicateDocMedia(doc) {
   if (!doc || typeof doc !== 'object') return doc;
   const clone = { ...doc };
@@ -97,6 +157,10 @@ export class MongoCollection {
     this.filePath = path.join(DATA_DIR, `${collectionName}.json`);
     this.memoryCache = [];
     this.realCollection = null;
+    this._pendingWrites = 0;
+    this._writeVersion = 0;
+    this._lastAtlasPull = 0;
+    this._pullPromise = null;
     this.loadData(initialData);
   }
 
@@ -135,22 +199,31 @@ export class MongoCollection {
     return false;
   }
 
+  normalizeRemoteDoc(doc) {
+    if (!doc || typeof doc !== 'object') return doc;
+    const resolvedId = doc.id !== undefined && doc.id !== null ? doc.id : String(doc._id);
+    const resolvedMongoId = doc._id !== undefined && doc._id !== null ? String(doc._id) : String(resolvedId);
+    return {
+      ...doc,
+      id: resolvedId,
+      _id: resolvedMongoId,
+    };
+  }
+
   async bindRealCollection(col) {
     this.realCollection = col;
     try {
+      const startVersion = this._writeVersion;
       const remoteDocs = await col.find({}).toArray();
+      if (this._writeVersion !== startVersion) return;
       const deletedSet = this.getDeletedSet();
 
       if (remoteDocs && remoteDocs.length > 0) {
-        // Delete any zombie documents in Atlas that were previously deleted locally
+        // Delete any zombie documents in Atlas that were previously deleted
         const zombieIds = [];
         const validRemoteDocs = [];
         for (const doc of remoteDocs) {
-          const normalized = {
-            ...doc,
-            id: doc.id || String(doc._id),
-            _id: doc._id || doc.id,
-          };
+          const normalized = this.normalizeRemoteDoc(doc);
           if (this.isDocDeleted(normalized, deletedSet)) {
             if (doc._id !== undefined) zombieIds.push(doc._id);
             if (doc.id !== undefined) zombieIds.push(doc.id);
@@ -160,97 +233,128 @@ export class MongoCollection {
         }
 
         if (zombieIds.length > 0) {
-          col
-            .deleteMany({
-              $or: [{ _id: { $in: zombieIds } }, { id: { $in: zombieIds } }],
-            })
-            .catch(() => {});
+          const zFilter = buildMongoOrFilter(zombieIds);
+          if (zFilter) {
+            await col.deleteMany(zFilter).catch(() => {});
+          }
         }
 
-        // Re-read latest deletedSet in case a deletion happened while remoteDocs was downloading
-        const latestDeletedSet = this.getDeletedSet();
-        const filteredRemote = validRemoteDocs.filter(
-          (doc) => !this.isDocDeleted(doc, latestDeletedSet)
-        );
-
-        // Merge local memoryCache with filteredRemote, preferring newer local documents so local edits are never overwritten
         const localById = new Map();
         for (const localItem of this.memoryCache || []) {
-          if (this.isDocDeleted(localItem, latestDeletedSet)) continue;
-          const key = String(localItem.id || localItem._id);
+          const key = String(localItem.id ?? localItem._id);
           if (key) localById.set(key, localItem);
         }
 
         const mergedDocs = [];
-        const seenIds = new Set();
-        const docsToPushToAtlas = [];
-
-        for (const remoteDoc of filteredRemote) {
-          const rKey = String(remoteDoc.id || remoteDoc._id);
+        for (const remoteDoc of validRemoteDocs) {
+          const rKey = String(remoteDoc.id ?? remoteDoc._id);
           const localDoc =
             localById.get(rKey) ||
             localById.get(String(remoteDoc._id)) ||
             localById.get(String(remoteDoc.id));
 
-          if (localDoc) {
-            const localTime = new Date(localDoc.updatedAt || localDoc.createdAt || 0).getTime() || 0;
-            const remoteTime = new Date(remoteDoc.updatedAt || remoteDoc.createdAt || 0).getTime() || 0;
-            if (localTime >= remoteTime) {
-              mergedDocs.push(localDoc);
-              if (JSON.stringify(localDoc) !== JSON.stringify(remoteDoc)) {
-                docsToPushToAtlas.push(localDoc);
-              }
-            } else {
-              mergedDocs.push(remoteDoc);
+          // Preserve local SEO metadata if remote doc doesn't have it yet
+          if (localDoc && localDoc.seo && (!remoteDoc.seo || !remoteDoc.seo.metaTitle)) {
+            const withSeo = { ...remoteDoc, seo: localDoc.seo };
+            mergedDocs.push(withSeo);
+            const filter = buildMongoOrFilter([remoteDoc._id, remoteDoc.id]);
+            if (filter) {
+              col.updateOne(filter, { $set: { seo: localDoc.seo } }).catch(() => {});
             }
-            seenIds.add(String(localDoc.id));
-            seenIds.add(String(localDoc._id));
           } else {
             mergedDocs.push(remoteDoc);
           }
-          seenIds.add(String(remoteDoc.id));
-          seenIds.add(String(remoteDoc._id));
-        }
-
-        for (const localItem of this.memoryCache || []) {
-          if (this.isDocDeleted(localItem, latestDeletedSet)) continue;
-          const lid = String(localItem.id || localItem._id);
-          if (!seenIds.has(lid) && !seenIds.has(String(localItem._id))) {
-            mergedDocs.push(localItem);
-            docsToPushToAtlas.push(localItem);
-            seenIds.add(lid);
-          }
-        }
-
-        for (const item of docsToPushToAtlas) {
-          try {
-            const docId = item.id || item._id;
-            await col.replaceOne(
-              { _id: docId },
-              { ...item, _id: docId, id: docId },
-              { upsert: true }
-            );
-          } catch {}
         }
 
         this.memoryCache = mergedDocs;
+        this._lastAtlasPull = Date.now();
         this.saveData();
-      } else if (this.memoryCache && this.memoryCache.length > 0) {
+      } else if (this.memoryCache && this.memoryCache.length > 0 && deletedSet.size === 0) {
+        // Only push initial seed data to Atlas if Atlas is empty AND user has not deleted records
         this.memoryCache = this.memoryCache.filter((item) => !this.isDocDeleted(item, deletedSet));
         this.saveData();
         for (const item of this.memoryCache) {
           try {
             const docId = item.id || item._id;
-            await col.replaceOne(
+            const { _id: _omit, ...rest } = item;
+            await col.updateOne(
               { _id: docId },
-              { ...item, _id: docId, id: docId },
+              { $set: { ...rest, id: docId } },
               { upsert: true }
             );
           } catch {}
         }
+        this._lastAtlasPull = Date.now();
+      } else {
+        this.memoryCache = [];
+        this._lastAtlasPull = Date.now();
+        this.saveData();
       }
     } catch (err) {
       console.warn(`[MongoDB Node.js] Sync notice on ${this.collectionName}:`, err.message);
+    }
+  }
+
+  // Real-time pull from live MongoDB Atlas so any changes in Atlas or other instances immediately reflect in Backend & Portfolio Frontend
+  async pullFromAtlas(force = false) {
+    if (!this.realCollection) return;
+    if (this._pendingWrites > 0) return;
+
+    const now = Date.now();
+    if (!force && this._lastAtlasPull && now - this._lastAtlasPull < 4000) {
+      return;
+    }
+
+    if (this._pullPromise) {
+      if (force) {
+        await this._pullPromise.catch(() => {});
+      }
+      return;
+    }
+
+    this._lastAtlasPull = now;
+    const startVersion = this._writeVersion;
+    this._pullPromise = (async () => {
+      try {
+        const remoteDocs = await this.realCollection.find({}).toArray();
+        // CRITICAL: If a write or delete happened while this pull was in flight, discard stale pull!
+        if (this._pendingWrites > 0 || this._writeVersion !== startVersion) return;
+        if (Array.isArray(remoteDocs)) {
+          const deletedSet = this.getDeletedSet();
+          const validRemote = [];
+          const zombieIds = [];
+          for (const doc of remoteDocs) {
+            const normalized = this.normalizeRemoteDoc(doc);
+            if (!this.isDocDeleted(normalized, deletedSet)) {
+              validRemote.push(normalized);
+            } else {
+              if (doc._id !== undefined) zombieIds.push(doc._id);
+              if (doc.id !== undefined) zombieIds.push(doc.id);
+            }
+          }
+          if (zombieIds.length > 0) {
+            const zFilter = buildMongoOrFilter(zombieIds);
+            if (zFilter) {
+              this.realCollection.deleteMany(zFilter).catch(() => {});
+            }
+          }
+          if (this._pendingWrites > 0 || this._writeVersion !== startVersion) return;
+          const prevJson = JSON.stringify(this.memoryCache);
+          const nextJson = JSON.stringify(validRemote);
+          if (prevJson !== nextJson) {
+            this.memoryCache = validRemote;
+            this.saveData();
+          }
+        }
+      } catch (err) {
+        // ignore transient network glitch
+      } finally {
+        this._pullPromise = null;
+      }
+    })();
+
+    if (force) {
+      await this._pullPromise;
     }
   }
 
@@ -303,6 +407,14 @@ export class MongoCollection {
   }
 
   async find(query = {}) {
+    // Trigger background Atlas sync without blocking real-time API responses
+    this.pullFromAtlas(false).catch(() => {});
+    const deletedSet = this.getDeletedSet();
+    const cleanCache = this.memoryCache.filter((item) => !this.isDocDeleted(item, deletedSet));
+    if (cleanCache.length !== this.memoryCache.length) {
+      this.memoryCache = cleanCache;
+      this.saveData();
+    }
     if (Object.keys(query).length === 0) {
       return [...this.memoryCache];
     }
@@ -321,6 +433,7 @@ export class MongoCollection {
   }
 
   async findById(id) {
+    this.pullFromAtlas(false).catch(() => {});
     const rawStr = String(id).trim();
     let decodedStr = rawStr;
     try {
@@ -336,26 +449,25 @@ export class MongoCollection {
           String(item._id) === decodedStr ||
           String(item.id) === decodedStr ||
           (item.name && (String(item.name) === decodedStr || String(item.name).toLowerCase() === lowerStr)) ||
-          (item.title && (String(item.title) === decodedStr || String(item.title).toLowerCase() === lowerStr))
+          (item.title && (String(item.title) === decodedStr || String(item.title).toLowerCase() === lowerStr)) ||
+          (item.degree && (String(item.degree) === decodedStr || String(item.degree).toLowerCase() === lowerStr)) ||
+          (item.role && (String(item.role) === decodedStr || String(item.role).toLowerCase() === lowerStr)) ||
+          (item.subject && (String(item.subject) === decodedStr || String(item.subject).toLowerCase() === lowerStr))
       ) || null;
     if (localFound) return localFound;
 
-    const numId = !Number.isNaN(Number(id)) && String(Number(id)) === rawStr ? Number(id) : null;
     if (this.realCollection && !this.getDeletedSet().has(rawStr) && !this.getDeletedSet().has(decodedStr)) {
       try {
-        const orConditions = [
-          { _id: rawStr },
-          { id: rawStr },
-          { _id: decodedStr },
-          { id: decodedStr },
-          { name: decodedStr },
-          { title: decodedStr },
-        ];
-        if (numId !== null) {
-          orConditions.push({ _id: numId }, { id: numId });
+        const filter = buildMongoOrFilter([rawStr, decodedStr], {
+          name: decodedStr,
+          title: decodedStr,
+          role: decodedStr,
+          degree: decodedStr,
+        });
+        if (filter) {
+          const doc = await this.realCollection.findOne(filter);
+          if (doc) return this.normalizeRemoteDoc(doc);
         }
-        const doc = await this.realCollection.findOne({ $or: orConditions });
-        if (doc) return { ...doc, id: doc.id || doc._id?.toString() };
       } catch {
         // fallback
       }
@@ -364,13 +476,14 @@ export class MongoCollection {
   }
 
   async insertOne(doc) {
+    this._writeVersion++;
     const now = new Date().toISOString();
     const id = doc.id || doc._id || `doc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const strId = String(id);
     const cleanedDoc = deduplicateDocMedia(doc);
     const newDoc = {
       ...cleanedDoc,
-      _id: id,
+      _id: strId,
       id,
       createdAt: doc.createdAt || now,
       updatedAt: now,
@@ -384,26 +497,33 @@ export class MongoCollection {
       (item) => String(item.id) !== strId && String(item._id) !== strId
     );
     this.memoryCache.unshift(newDoc);
+    this._lastAtlasPull = Date.now();
     this.saveData();
 
     // Sync to live MongoDB Atlas in strict order so rapid insert+delete never race
     if (this.realCollection) {
       const col = this.realCollection;
+      this._pendingWrites++;
       const syncPromise = this.enqueueMongoSync(async () => {
-        const stillInMemory = this.memoryCache.some(
-          (item) => String(item.id) === strId || String(item._id) === strId
-        );
-        if (!stillInMemory) return;
-
         try {
-          await col.replaceOne(
-            { _id: id },
-            { ...newDoc, _id: id, id },
-            { upsert: true }
+          const stillInMemory = this.memoryCache.some(
+            (item) => String(item.id) === strId || String(item._id) === strId
           );
-        } catch {
-          await col.deleteMany({ $or: [{ _id: strId }, { id: strId }] });
-          await col.insertOne({ ...newDoc, _id: strId, id: strId });
+          if (!stillInMemory) return;
+
+          const { _id: _omit, ...safePayload } = newDoc;
+          const filter = buildMongoOrFilter([id, strId]);
+          const res = filter ? await col.updateOne(filter, { $set: safePayload }) : { matchedCount: 0 };
+          if (!res || res.matchedCount === 0) {
+            await col.updateOne(
+              { _id: strId },
+              { $set: safePayload },
+              { upsert: true }
+            );
+          }
+        } finally {
+          this._pendingWrites = Math.max(0, this._pendingWrites - 1);
+          this._lastAtlasPull = Date.now();
         }
       });
 
@@ -421,6 +541,7 @@ export class MongoCollection {
   }
 
   async updateOne(filter, updates) {
+    this._writeVersion++;
     const now = new Date().toISOString();
     const patch = deduplicateDocMedia({ ...updates, updatedAt: now });
     const targetId = filter._id !== undefined ? filter._id : filter.id;
@@ -431,10 +552,6 @@ export class MongoCollection {
         decodedTargetId = decodeURIComponent(strTargetId).trim();
       } catch {}
     }
-    const numTargetId =
-      strTargetId !== null && !Number.isNaN(Number(strTargetId)) && String(Number(strTargetId)) === strTargetId
-        ? Number(strTargetId)
-        : null;
 
     const index = this.memoryCache.findIndex((item) => {
       if (strTargetId !== null) {
@@ -444,7 +561,9 @@ export class MongoCollection {
           String(item._id) === decodedTargetId ||
           String(item.id) === decodedTargetId ||
           (item.name && String(item.name) === decodedTargetId) ||
-          (item.title && String(item.title) === decodedTargetId)
+          (item.title && String(item.title) === decodedTargetId) ||
+          (item.role && String(item.role) === decodedTargetId) ||
+          (item.degree && String(item.degree) === decodedTargetId)
         );
       }
       return Object.entries(filter).every(([k, v]) => String(item[k]) === String(v));
@@ -455,8 +574,10 @@ export class MongoCollection {
       const existing = strTargetId !== null ? await this.findById(strTargetId) : await this.findOne(filter);
       if (existing) {
         const docId = existing._id || existing.id || strTargetId;
-        updatedDoc = deduplicateDocMedia({ ...existing, ...patch, _id: docId, id: existing.id || docId });
+        this._writeVersion++;
+        updatedDoc = deduplicateDocMedia({ ...existing, ...patch, _id: String(docId), id: existing.id ?? docId });
         this.memoryCache.unshift(updatedDoc);
+        this._lastAtlasPull = Date.now();
         this.saveData();
       } else {
         return null;
@@ -467,36 +588,48 @@ export class MongoCollection {
       updatedDoc = deduplicateDocMedia({
         ...current,
         ...patch,
-        _id: docId,
-        id: current.id || docId,
+        _id: String(docId),
+        id: current.id ?? docId,
       });
       this.memoryCache[index] = updatedDoc;
+      this._lastAtlasPull = Date.now();
       this.saveData();
     }
 
     if (this.realCollection && updatedDoc) {
       const col = this.realCollection;
       const docToSync = { ...updatedDoc };
+      this._pendingWrites++;
       const syncPromise = this.enqueueMongoSync(async () => {
-        const { _id: _omitId, ...safePatch } = docToSync;
-        let mongoFilter = { ...filter };
-        if (strTargetId !== null) {
-          const orConditions = [
-            { _id: strTargetId },
-            { id: strTargetId },
-            { _id: decodedTargetId },
-            { id: decodedTargetId },
-            { name: decodedTargetId },
-          ];
-          if (numTargetId !== null) {
-            orConditions.push({ _id: numTargetId }, { id: numTargetId });
+        try {
+          const { _id: _omitId, ...safePatch } = docToSync;
+          const candidateIds = [
+            strTargetId,
+            decodedTargetId,
+            docToSync._id,
+            docToSync.id,
+          ].filter((v) => v !== undefined && v !== null);
+
+          const mongoFilter =
+            candidateIds.length > 0
+              ? buildMongoOrFilter(candidateIds, {
+                  ...(docToSync.name ? { name: docToSync.name } : {}),
+                  ...(docToSync.title ? { title: docToSync.title } : {}),
+                })
+              : { ...filter };
+
+          const res = await col.updateOne(mongoFilter, { $set: safePatch });
+          if (!res || res.matchedCount === 0) {
+            const fallbackId = String(docToSync._id || docToSync.id || strTargetId);
+            await col.updateOne(
+              { _id: fallbackId },
+              { $set: safePatch },
+              { upsert: true }
+            );
           }
-          mongoFilter = { $or: orConditions };
-        }
-        const res = await col.updateOne(mongoFilter, { $set: safePatch });
-        if (res.matchedCount === 0) {
-          const docId = docToSync._id || docToSync.id;
-          await col.replaceOne({ _id: docId }, docToSync, { upsert: true });
+        } finally {
+          this._pendingWrites = Math.max(0, this._pendingWrites - 1);
+          this._lastAtlasPull = Date.now();
         }
       });
 
@@ -514,6 +647,7 @@ export class MongoCollection {
   }
 
   async deleteOne(filter) {
+    this._writeVersion++;
     const targetId = filter._id !== undefined ? filter._id : filter.id;
     const strTargetId = targetId !== undefined ? String(targetId).trim() : null;
     let decodedTargetId = strTargetId;
@@ -523,10 +657,6 @@ export class MongoCollection {
       } catch {}
     }
     const lowerTargetId = decodedTargetId !== null ? decodedTargetId.toLowerCase() : null;
-    const numTargetId =
-      strTargetId !== null && !Number.isNaN(Number(strTargetId)) && String(Number(strTargetId)) === strTargetId
-        ? Number(strTargetId)
-        : null;
 
     const beforeLen = this.memoryCache.length;
     const matchedDocs = [];
@@ -544,7 +674,16 @@ export class MongoCollection {
               String(item.name).toLowerCase() === lowerTargetId)) ||
           (item.title &&
             (String(item.title) === decodedTargetId ||
-              String(item.title).toLowerCase() === lowerTargetId));
+              String(item.title).toLowerCase() === lowerTargetId)) ||
+          (item.role &&
+            (String(item.role) === decodedTargetId ||
+              String(item.role).toLowerCase() === lowerTargetId)) ||
+          (item.degree &&
+            (String(item.degree) === decodedTargetId ||
+              String(item.degree).toLowerCase() === lowerTargetId)) ||
+          (item.subject &&
+            (String(item.subject) === decodedTargetId ||
+              String(item.subject).toLowerCase() === lowerTargetId));
       } else {
         isMatch = Object.entries(filter).every(([k, v]) => String(item[k]) === String(v));
       }
@@ -554,37 +693,75 @@ export class MongoCollection {
       return !isMatch;
     });
 
-    // Record tombstones so syncInitialSkills / bindRealCollection never resurrects deleted items
-    const idsToTombstone = [strTargetId, decodedTargetId];
+    // Record tombstones so syncInitialSkills / bindRealCollection / pullFromAtlas never resurrects deleted items
+    const idsToTombstone = [strTargetId, decodedTargetId].filter(Boolean);
     for (const m of matchedDocs) {
       if (m._id !== undefined) idsToTombstone.push(String(m._id));
       if (m.id !== undefined) idsToTombstone.push(String(m.id));
       if (this.collectionName === 'skills' && m.name) idsToTombstone.push(String(m.name));
     }
     this.markIdsDeleted(idsToTombstone);
+    this._lastAtlasPull = Date.now();
     this.saveData();
 
     let deletedInAtlas = false;
     if (this.realCollection) {
       const col = this.realCollection;
+      this._pendingWrites++;
       const syncPromise = this.enqueueMongoSync(async () => {
-        let mongoFilter = { ...filter };
-        if (strTargetId !== null) {
-          const allIds = Array.from(new Set(idsToTombstone.filter(Boolean)));
-          const orConditions = [
-            { _id: { $in: allIds } },
-            { id: { $in: allIds } },
-            { name: decodedTargetId },
-            { title: decodedTargetId },
-          ];
-          if (numTargetId !== null) {
-            orConditions.push({ _id: numTargetId }, { id: numTargetId });
+        try {
+          const mongoFilter =
+            strTargetId !== null
+              ? buildMongoOrFilter(idsToTombstone, {
+                  name: decodedTargetId,
+                  title: decodedTargetId,
+                  role: decodedTargetId,
+                  degree: decodedTargetId,
+                  subject: decodedTargetId,
+                })
+              : { ...filter };
+
+          if (mongoFilter) {
+            // Find any remote docs matching this filter so we also tombstone both their _id and id
+            try {
+              const remoteMatched = await col.find(mongoFilter).toArray();
+              if (Array.isArray(remoteMatched) && remoteMatched.length > 0) {
+                const extraIds = [];
+                for (const rm of remoteMatched) {
+                  if (rm._id !== undefined) extraIds.push(String(rm._id));
+                  if (rm.id !== undefined) extraIds.push(String(rm.id));
+                  if (this.collectionName === 'skills' && rm.name) extraIds.push(String(rm.name));
+                }
+                if (extraIds.length > 0) {
+                  this.markIdsDeleted(extraIds);
+                  const extraSet = new Set(extraIds);
+                  this.memoryCache = this.memoryCache.filter(
+                    (it) => !extraSet.has(String(it._id)) && !extraSet.has(String(it.id))
+                  );
+                  this.saveData();
+                }
+              }
+            } catch {}
+
+            const finalFilter =
+              strTargetId !== null
+                ? buildMongoOrFilter([...idsToTombstone, ...Array.from(this.getDeletedSet()).slice(-10)], {
+                    name: decodedTargetId,
+                    title: decodedTargetId,
+                    role: decodedTargetId,
+                    degree: decodedTargetId,
+                    subject: decodedTargetId,
+                  })
+                : mongoFilter;
+
+            const delRes = await col.deleteMany(finalFilter || mongoFilter);
+            if (delRes && delRes.deletedCount > 0) {
+              deletedInAtlas = true;
+            }
           }
-          mongoFilter = { $or: orConditions };
-        }
-        const delRes = await col.deleteMany(mongoFilter);
-        if (delRes && delRes.deletedCount > 0) {
-          deletedInAtlas = true;
+        } finally {
+          this._pendingWrites = Math.max(0, this._pendingWrites - 1);
+          this._lastAtlasPull = Date.now();
         }
       });
 
@@ -603,6 +780,7 @@ export class MongoCollection {
   }
 
   async deleteMany(filter = {}) {
+    this._writeVersion++;
     const isClearAll = !filter || Object.keys(filter).length === 0;
     const matchedDocs = [];
 
@@ -625,19 +803,26 @@ export class MongoCollection {
       if (this.collectionName === 'skills' && m.name) idsToTombstone.push(String(m.name));
     }
     this.markIdsDeleted(idsToTombstone);
+    this._lastAtlasPull = Date.now();
     this.saveData();
 
     if (this.realCollection) {
       const col = this.realCollection;
+      this._pendingWrites++;
       const syncPromise = this.enqueueMongoSync(async () => {
-        if (isClearAll) {
-          await col.deleteMany({});
-        } else if (idsToTombstone.length > 0) {
-          await col.deleteMany({
-            $or: [{ _id: { $in: idsToTombstone } }, { id: { $in: idsToTombstone } }, filter],
-          });
-        } else {
-          await col.deleteMany(filter);
+        try {
+          if (isClearAll) {
+            await col.deleteMany({});
+          } else if (idsToTombstone.length > 0) {
+            await col.deleteMany({
+              $or: [{ _id: { $in: idsToTombstone } }, { id: { $in: idsToTombstone } }, filter],
+            });
+          } else {
+            await col.deleteMany(filter);
+          }
+        } finally {
+          this._pendingWrites = Math.max(0, this._pendingWrites - 1);
+          this._lastAtlasPull = Date.now();
         }
       });
 
@@ -671,7 +856,10 @@ export class MongoDatabase {
       }
     } catch (e) {}
 
-    this.uri = process.env.MONGODB_URI || savedUri || 'mongodb://localhost:27017/sachin_portfolio_db';
+    this.uri =
+      process.env.MONGODB_URI ||
+      savedUri ||
+      'mongodb+srv://sachinkumargheura_db_user:Sachin123@cluster0.jlcorya.mongodb.net/sachin_portfolio_db?retryWrites=true&w=majority';
     this.dbType = 'MongoDB NoSQL Database';
     this.isConnected = true;
     this.isLiveAtlas = false;
@@ -866,16 +1054,83 @@ export class MongoDatabase {
       },
     ]);
 
-    // Ensure initial experiences and skills are present if empty
+    // Ensure initial experiences, skills, and project SEO metadata are present
     if (!this.experience.memoryCache || this.experience.memoryCache.length === 0) {
       this.syncInitialExperiences().catch(() => null);
     }
     if (!this.skills.memoryCache || this.skills.memoryCache.length === 0) {
       this.syncInitialSkills().catch(() => null);
     }
+    this.syncInitialProjectSeo().catch(() => null);
 
     // Asynchronously attempt to connect to live MongoDB Atlas if provided
     this.connectToRealMongo();
+  }
+
+  async syncInitialProjectSeo() {
+    try {
+      let modified = false;
+      const nowIso = new Date().toISOString();
+      this.projects.memoryCache = (this.projects.memoryCache || []).map((proj) => {
+        if (proj.seo && proj.seo.metaTitle) return proj;
+        modified = true;
+        const techList = Array.isArray(proj.technologies) && proj.technologies.length > 0
+          ? proj.technologies.join(', ')
+          : Array.isArray(proj.tech) && proj.tech.length > 0
+          ? proj.tech.join(', ')
+          : 'React, Node.js, MongoDB';
+        const primaryTech = Array.isArray(proj.technologies) && proj.technologies.length > 0
+          ? proj.technologies.slice(0, 3).join(', ')
+          : 'Full Stack';
+        const cleanTitle = proj.title || 'Portfolio Project';
+        let metaTitle = `${cleanTitle} – ${primaryTech} Project | Sachin Kumar`;
+        if (metaTitle.length > 60) {
+          metaTitle = `${cleanTitle} | Sachin Kumar Portfolio`;
+        }
+        const descPrefix = proj.description
+          ? String(proj.description).replace(/\s+/g, ' ').trim()
+          : `Production software engineering project built with ${techList}`;
+        let metaDescription = `${cleanTitle}: ${descPrefix} Built by Sachin Kumar using ${primaryTech}.`;
+        if (metaDescription.length > 158) {
+          metaDescription = metaDescription.slice(0, 155).trim() + '...';
+        }
+        return {
+          ...proj,
+          seo: {
+            metaTitle,
+            metaDescription,
+            keywords: `${cleanTitle}, ${proj.category || 'Full Stack'}, ${techList}, Sachin Kumar, Software Engineer Portfolio`,
+            canonicalUrl: proj.live || proj.liveUrl || 'https://sachinkumar.dev/#projects',
+            ogImage: proj.image || '/images/My_portfolio.png',
+            twitterCard: 'summary_large_image',
+            robots: 'index, follow',
+            schemaType:
+              String(proj.category || '').toLowerCase().includes('ai')
+                ? 'SoftwareApplication'
+                : 'WebApplication',
+            author: 'Sachin Kumar',
+            updatedAt: nowIso,
+          },
+        };
+      });
+      if (modified) {
+        this.projects.saveData();
+        if (this.projects.realCollection) {
+          for (const item of this.projects.memoryCache) {
+            try {
+              const docId = item.id || item._id;
+              await this.projects.realCollection.replaceOne(
+                { _id: docId },
+                { ...item, _id: docId, id: docId },
+                { upsert: true }
+              );
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[MongoDB Node.js] syncInitialProjectSeo notice:', err.message);
+    }
   }
 
   normalizeMongoUri(rawInput) {
@@ -946,6 +1201,10 @@ export class MongoDatabase {
         this.saveUriConfig(targetUri);
         console.log(`[MongoDB Node.js] SUCCESS: Connected to live MongoDB Database "${this.realDb.databaseName}"!`);
 
+        // First bind audit_logs and reconcile any deletions recorded in Atlas across instances
+        await this.auditLogs.bindRealCollection(this.realDb.collection('audit_logs'));
+        await this.reconcileDeletedFromAuditLogs();
+
         // Bind live collections in parallel
         await Promise.all([
           this.projects.bindRealCollection(this.realDb.collection('projects')),
@@ -957,11 +1216,10 @@ export class MongoDatabase {
           this.profile.bindRealCollection(this.realDb.collection('profile')),
           this.analytics.bindRealCollection(this.realDb.collection('analytics')),
           this.users.bindRealCollection(this.realDb.collection('users')),
-          this.auditLogs.bindRealCollection(this.realDb.collection('audit_logs')),
         ]);
 
-        // Auto-seed to live MongoDB if collections are completely empty
-        await this.autoSeedAtlasIfEmpty();
+        // Ensure all projects in Atlas have their SEO metadata synced
+        await this.syncInitialProjectSeo();
 
         return {
           success: true,
@@ -989,10 +1247,77 @@ export class MongoDatabase {
     };
   }
 
+  async reconcileDeletedFromAuditLogs() {
+    try {
+      const logs = this.auditLogs.memoryCache || [];
+      if (!Array.isArray(logs) || logs.length === 0) return;
+
+      // Sort oldest to newest so a later CREATE after DELETE unmarks the ID
+      const sorted = [...logs].sort(
+        (a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+      );
+
+      const colMap = {
+        projects: this.projects,
+        certifications: this.certifications,
+        education: this.education,
+        experience: this.experience,
+        skills: this.skills,
+        messages: this.messages,
+      };
+
+      const deletedByCol = {
+        projects: new Set(),
+        certifications: new Set(),
+        education: new Set(),
+        experience: new Set(),
+        skills: new Set(),
+        messages: new Set(),
+      };
+
+      for (const entry of sorted) {
+        const colName = String(entry.collectionName || '').toLowerCase().trim();
+        const targetSet = deletedByCol[colName];
+        if (!targetSet) continue;
+
+        const ids = [
+          entry.targetId,
+          entry.diff?.before?.id,
+          entry.diff?.before?._id,
+          entry.diff?.after?.id,
+          entry.diff?.after?._id,
+        ]
+          .filter((x) => x !== undefined && x !== null)
+          .map((x) => String(x).trim())
+          .filter(Boolean);
+
+        if (entry.action === 'DELETE') {
+          for (const id of ids) targetSet.add(id);
+        } else if (entry.action === 'CREATE') {
+          for (const id of ids) targetSet.delete(id);
+        }
+      }
+
+      for (const [colName, idSet] of Object.entries(deletedByCol)) {
+        if (idSet.size === 0) continue;
+        const colInstance = colMap[colName];
+        if (!colInstance) continue;
+        const idArr = Array.from(idSet);
+        colInstance.markIdsDeleted(idArr);
+        colInstance.memoryCache = (colInstance.memoryCache || []).filter(
+          (doc) => !idSet.has(String(doc._id)) && !idSet.has(String(doc.id))
+        );
+        colInstance.saveData();
+      }
+    } catch (err) {
+      console.warn('[MongoDB Node.js] reconcileDeletedFromAuditLogs notice:', err.message);
+    }
+  }
+
   async syncInitialExperiences() {
     try {
       const deletedSet = this.experience.getDeletedSet();
-      // Only seed experiences that don't already exist in memoryCache and were not deleted
+      if (deletedSet.size > 0 && this.experience.memoryCache.length > 0) return;
       for (const exp of initialExperiences) {
         if (this.experience.isDocDeleted(exp, deletedSet)) continue;
         const item = {
@@ -1019,23 +1344,6 @@ export class MongoDatabase {
         }
       }
       this.experience.saveData();
-
-      if (this.experience.realCollection) {
-        const count = await this.experience.realCollection.countDocuments();
-        if (count === 0) {
-          for (const item of this.experience.memoryCache) {
-            try {
-              const docId = item.id || item._id;
-              await this.experience.realCollection.replaceOne(
-                { $or: [{ _id: docId }, { id: docId }] },
-                item,
-                { upsert: true }
-              );
-            } catch (err) {}
-          }
-        }
-      }
-      console.log('[MongoDB Node.js] Verified initial internship experiences in database.');
     } catch (err) {
       console.warn('[MongoDB Node.js] syncInitialExperiences warning:', err.message);
     }
@@ -1044,6 +1352,7 @@ export class MongoDatabase {
   async syncInitialSkills() {
     try {
       const deletedSet = this.skills.getDeletedSet();
+      if (deletedSet.size > 0 && this.skills.memoryCache.length > 0) return;
       for (const s of defaultSkillsList) {
         if (this.skills.isDocDeleted(s, deletedSet)) continue;
         const item = {
@@ -1060,63 +1369,13 @@ export class MongoDatabase {
         }
       }
       this.skills.saveData();
-
-      if (this.skills.realCollection) {
-        const count = await this.skills.realCollection.countDocuments();
-        if (count === 0) {
-          for (const item of this.skills.memoryCache) {
-            try {
-              const docId = item.id || item._id;
-              await this.skills.realCollection.replaceOne(
-                { $or: [{ _id: docId }, { id: docId }] },
-                item,
-                { upsert: true }
-              );
-            } catch (err) {}
-          }
-        }
-      }
-      console.log(`[MongoDB Node.js] Verified ${this.skills.memoryCache.length} skills in database.`);
     } catch (err) {
       console.warn('[MongoDB Node.js] syncInitialSkills warning:', err.message);
     }
   }
 
   async autoSeedAtlasIfEmpty() {
-    try {
-      const projCount = await this.projects.countDocuments();
-      if (projCount === 0 && this.projects.memoryCache.length > 0) {
-        for (const p of this.projects.memoryCache) {
-          await this.projects.insertOne(p);
-        }
-      }
-      const certCount = await this.certifications.countDocuments();
-      if (certCount === 0 && this.certifications.memoryCache.length > 0) {
-        for (const c of this.certifications.memoryCache) {
-          await this.certifications.insertOne(c);
-        }
-      }
-      const expCount = await this.experience.countDocuments();
-      if (expCount === 0 && this.experience.memoryCache.length > 0) {
-        for (const ex of this.experience.memoryCache) {
-          await this.experience.insertOne(ex);
-        }
-      }
-      const skillCount = await this.skills.countDocuments();
-      if (skillCount === 0 && this.skills.memoryCache.length > 0) {
-        for (const sk of this.skills.memoryCache) {
-          await this.skills.insertOne(sk);
-        }
-      }
-      const eduCount = await this.education.countDocuments();
-      if (eduCount === 0 && this.education.memoryCache.length > 0) {
-        for (const e of this.education.memoryCache) {
-          await this.education.insertOne(e);
-        }
-      }
-    } catch (err) {
-      console.warn('[MongoDB Node.js] Auto-seed warning:', err.message);
-    }
+    // No-op: bindRealCollection already handles initial empty collection seeding while respecting deletedSet
   }
 
   async getHealth() {

@@ -1,5 +1,8 @@
 {
-  "projects": [],
+  "projects": [
+    "proj_1794476777559_vsakb",
+    "proj_1794567715498_6ibcu"
+  ],
   "certifications": [
     "cert_1794329993576_pc3k9",
     "cert_1794388588073_6xd7w",
@@ -13,7 +16,13 @@
   "experience": [
     "exp_1794390467381_h56x6",
     "exp_1794394707343_cmf68",
-    "exp_1794395185946_2b9h7"
+    "exp_1794395185946_2b9h7",
+    "exp_1794404124302_f8yhe",
+    "exp_1794312971825_ifn2d",
+    "exp_1794304014928_vnfzw",
+    "exp_1794222975506_dtp7m",
+    "exp_1794222641195_azwtb",
+    "exp_test_delete_99"
   ],
   "skills": [
     "skill_tools-devops_2_linux___bash",
@@ -29,7 +38,8 @@
   "messages": [
     "msg_1794405375783_89afi",
     "msg_2",
-    "msg_1"
+    "msg_1",
+    "doc_1794151273592_p24tqc"
   ],
   "audit_logs": [
     "audit_1794405377113_pfb300",
@@ -67,6 +77,10 @@
     "audit_1794222974518_n97wc0",
     "audit_1794222641049_thi5k6",
     "audit_1794222640635_m6fclt",
-    "audit_1794222640195_wwkuc7"
+    "audit_1794222640195_wwkuc7",
+    "audit_1794565734266_sm1xno",
+    "audit_1794565733971_5j09a4",
+    "audit_1794567716424_o5cjxl",
+    "audit_1794567715778_ffr0jo"
   ]
 }

@@ -1,18 +1,6 @@
 [
   {
-    "_id": "doc_1794151273592_p24tqc",
-    "name": "Sachin sharma",
-    "email": "sachin@gmail.com",
-    "subject": "Hello from your Portfolio!",
-    "message": "Hi Sachin, I reviewed your portfolio and would like to discuss an opportunity for a Full-Stack / AI Engineer role on our team.",
-    "inquiryType": "general",
-    "timestamp": "2026-11-08T15:21:13.592Z",
-    "status": "read",
-    "id": "doc_1794151273592_p24tqc",
-    "createdAt": "2026-11-08T15:21:13.592Z",
-    "updatedAt": "2026-11-08T15:21:39.373Z"
-  },
-  {
+    "_id": "msg_1794408355621_fjfjy",
     "id": "msg_1794408355621_fjfjy",
     "name": "Aman sharma",
     "email": "aman@gmail.com",
@@ -23,8 +11,22 @@
     "timestamp": "2026-11-11T14:45:55.621Z",
     "createdAt": "2026-11-11T14:45:55.621Z",
     "status": "read",
-    "_id": "msg_1794408355621_fjfjy",
     "updatedAt": "2026-11-11T14:46:15.829Z",
     "readAt": "2026-11-11T14:46:15.829Z"
+  },
+  {
+    "_id": "msg_1794417944946_antaw",
+    "id": "msg_1794417944946_antaw",
+    "name": "Sanny Sharma",
+    "email": "sanny@gmail.com",
+    "subject": "New Freelance / Contract Project Inquiry",
+    "message": "my project building need please help me .",
+    "inquiryType": "freelance",
+    "emailSent": true,
+    "timestamp": "2026-11-11T17:25:44.946Z",
+    "createdAt": "2026-11-11T17:25:44.946Z",
+    "status": "read",
+    "updatedAt": "2026-11-11T17:26:23.519Z",
+    "readAt": "2026-11-11T17:26:23.519Z"
   }
 ]

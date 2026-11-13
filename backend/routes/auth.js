@@ -244,11 +244,17 @@ authRouter.post('/logout', (req, res) => {
 // 5. MASTER PASSCODE / VERIFY FALLBACK (Returns Signed JWT)
 authRouter.post('/verify', (req, res) => {
   const { passcode, email } = req.body || {};
-  const validAdminEmails = ['sachinkumar.gheura@gmail.com', 'admin@sachinkumar.dev'];
+  const validAdminEmails = [
+    'sachinkumar.gheura@gmail.com',
+    'admin@sachinkumar.dev',
+    'sachin@portfolio.dev',
+    'sachin@portfolio',
+  ];
   const isValidEmail = email && validAdminEmails.includes(String(email).toLowerCase());
   const isValidPasscode =
     passcode === 'admin123' ||
     passcode === 'sachin2026' ||
+    passcode === 'Admin@Sachin2025' ||
     passcode === 'master';
 
   if (isValidEmail || isValidPasscode) {

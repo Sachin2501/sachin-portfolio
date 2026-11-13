@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
   Trash2,
@@ -93,6 +93,27 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [statusMessage, setStatusMessage] = useState(null);
+  const [adminTheme, setAdminTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem('admin_portal_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch {
+      // ignore
+    }
+    return 'dark';
+  });
+
+  const handleToggleAdminTheme = useCallback(() => {
+    setAdminTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('admin_portal_theme', next);
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
 
   // Active editing IDs for in-place edit & MongoDB updates
   const [editingProjectId, setEditingProjectId] = useState(null);
@@ -120,6 +141,18 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
   const [contactMessages, setContactMessages] = useState([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [backendHealth, setBackendHealth] = useState({ status: 'checking', runtime: 'Node.js' });
+  const [portfolioPing, setPortfolioPing] = useState({
+    state: 'checking',
+    statusText: 'Checking...',
+    latencyMs: null,
+    avgLatencyMs: null,
+    minLatencyMs: null,
+    maxLatencyMs: null,
+    latencyHistory: [],
+    pingCount: 0,
+    uptimeSeconds: 0,
+    lastCheckedAt: null,
+  });
 
   // Category Filter & Search states in Admin (matching Frontend categories)
   const [projectSearch, setProjectSearch] = useState('');
@@ -214,42 +247,87 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     return true;
   };
 
-  // Fetch Node.js backend and MongoDB data (cache-busted for real-time accuracy)
+  // Periodic ping to /api/portfolio + /api/stats + /api/health for live latency & uptime
   const fetchBackendData = useCallback(async () => {
     const fetchOpts = { cache: 'no-store' };
+    const pingStart = performance.now();
     try {
-      const [statsRes, healthRes] = await Promise.all([
+      const [portfolioRes, statsRes, healthRes] = await Promise.all([
+        fetch(buildApiUrl('/api/portfolio'), fetchOpts).catch(() => null),
         fetch(buildApiUrl('/api/stats'), fetchOpts).catch(() => null),
         fetch(buildApiUrl('/api/health'), fetchOpts).catch(() => null),
       ]);
-      if (statsRes?.ok) {
-        const statsData = await statsRes.json();
+      const latencyMs = Math.max(1, Math.round(performance.now() - pingStart));
+
+      const pData = portfolioRes ? await portfolioRes.json().catch(() => ({})) : {};
+      const statsData = statsRes?.ok ? await statsRes.json().catch(() => null) : null;
+      const healthData = healthRes?.ok ? await healthRes.json().catch(() => null) : null;
+
+      if (statsData) {
         setApiStats((prev) => ({ ...prev, ...statsData }));
       }
-      if (healthRes?.ok) {
-        const healthData = await healthRes.json();
+      if (healthData) {
         setBackendHealth(healthData);
+      }
+
+      const portfolioOk = Boolean(portfolioRes && portfolioRes.ok && pData?.success !== false);
+      const fallbackOk = Boolean(healthRes?.ok || statsRes?.ok || isBackendConnected);
+      const isOnline = portfolioOk || fallbackOk;
+
+      if (isOnline) {
+        const resolvedUptime =
+          typeof pData?.uptimeSeconds === 'number' && pData.uptimeSeconds > 0
+            ? pData.uptimeSeconds
+            : typeof statsData?.serverUptimeSeconds === 'number'
+            ? statsData.serverUptimeSeconds
+            : typeof healthData?.serverUptimeSeconds === 'number'
+            ? healthData.serverUptimeSeconds
+            : null;
+
+        setPortfolioPing((prev) => ({
+          ...prev,
+          state: latencyMs >= 450 ? 'degraded' : 'online',
+          statusText: '200 OK',
+          latencyMs,
+          uptimeSeconds: resolvedUptime !== null ? resolvedUptime : prev.uptimeSeconds || 1,
+          lastCheckedAt: new Date().toLocaleTimeString(),
+        }));
+      } else {
+        setPortfolioPing((prev) => ({
+          ...prev,
+          state: 'offline',
+          statusText: portfolioRes ? `${portfolioRes.status} ERR` : 'OFFLINE',
+          latencyMs,
+          lastCheckedAt: new Date().toLocaleTimeString(),
+        }));
       }
     } catch {
       // ignore
     }
-  }, []);
+  }, [isBackendConnected]);
+
+  // Increment uptimeSeconds every second between periodic /api/portfolio pings
+  useEffect(() => {
+    if (portfolioPing.state === 'offline') return undefined;
+    const timer = setInterval(() => {
+      setPortfolioPing((prev) => ({
+        ...prev,
+        uptimeSeconds: prev.uptimeSeconds > 0 ? prev.uptimeSeconds + 1 : prev.uptimeSeconds,
+      }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [portfolioPing.state]);
 
   const fetchContactMessages = useCallback(async () => {
     setIsLoadingMessages(true);
     try {
-      const res = await fetch(buildApiUrl('/api/contact/messages'), { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        const list = data.messages || data.data || [];
-        setContactMessages(list);
-      }
+      await refreshPortfolioData();
     } catch {
       // ignore
     } finally {
       setIsLoadingMessages(false);
     }
-  }, []);
+  }, [refreshPortfolioData]);
 
   // Keep local contactMessages synchronized in real-time with PortfolioBackendContext
   useEffect(() => {
@@ -280,7 +358,21 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     }
   }, [activeTab, fetchContactMessages, fetchBackendData, fetchAuditLogs, fetchAuditStats]);
 
+  const lastSyncedProfileSigRef = useRef('');
   useEffect(() => {
+    if (!profileConfig) return;
+    const sig = JSON.stringify({
+      heroImage: profileConfig.heroImage || '',
+      aboutImage: profileConfig.aboutImage || '',
+      logoImage: profileConfig.logoImage || '',
+      resumeUrl: profileConfig.resumeUrl || '',
+      name: profileConfig.name || '',
+      title: profileConfig.title || '',
+      bioLead: profileConfig.bioLead || '',
+    });
+    if (sig === lastSyncedProfileSigRef.current) return;
+    lastSyncedProfileSigRef.current = sig;
+
     setPhotoForm((prev) => ({
       ...prev,
       heroImage: profileConfig.heroImage || prev.heroImage,
@@ -394,12 +486,14 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
   const handleDeleteProject = async (proj) => {
     if (!requireAdminAuth('delete project')) return;
     try {
-      await deleteProject(proj.id || proj._id);
-      if (editingProjectId === (proj.id || proj._id)) {
+      const pId = proj.id || proj._id;
+      await deleteProject(proj);
+      if (editingProjectId && String(editingProjectId) === String(pId)) {
         handleCancelEditProject();
       }
-      showToast(`Project "${proj.title}" deleted permanently from MongoDB & Frontend!`);
+      await refreshPortfolioData();
       fetchBackendData();
+      showToast(`Project "${proj.title}" deleted permanently from MongoDB & Frontend!`);
     } catch (err) {
       showToast('Failed to delete project: ' + err.message, true);
     }
@@ -554,8 +648,9 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       if (previewCertificate && String(previewCertificate.id || previewCertificate._id) === String(cId)) {
         setPreviewCertificate(null);
       }
-      showToast(`Certification "${cert.title}" deleted permanently from MongoDB & Portfolio!`);
+      await refreshPortfolioData();
       fetchBackendData();
+      showToast(`Certification "${cert.title}" deleted permanently from MongoDB & Portfolio!`);
     } catch (err) {
       showToast('Failed to delete certification: ' + err.message, true);
     }
@@ -697,12 +792,14 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
   const handleDeleteEdu = async (edu) => {
     if (!requireAdminAuth('delete education')) return;
     try {
-      await deleteEducation(edu.id || edu._id);
-      if (editingEduId === (edu.id || edu._id)) {
+      const eId = edu.id || edu._id;
+      await deleteEducation(edu);
+      if (editingEduId && String(editingEduId) === String(eId)) {
         handleCancelEditEdu();
       }
-      showToast(`Education "${edu.degree || edu.title}" deleted permanently from MongoDB & Portfolio!`);
+      await refreshPortfolioData();
       fetchBackendData();
+      showToast(`Education "${edu.degree || edu.title}" deleted permanently from MongoDB & Portfolio!`);
     } catch (err) {
       showToast('Failed to delete education: ' + err.message, true);
     }
@@ -900,12 +997,14 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
   const handleDeleteExp = async (exp) => {
     if (!requireAdminAuth('delete experience')) return;
     try {
-      await deleteExperience(exp.id || exp._id);
-      if (editingExpId === (exp.id || exp._id)) {
+      const eId = exp.id || exp._id;
+      await deleteExperience(exp);
+      if (editingExpId && String(editingExpId) === String(eId)) {
         handleCancelEditExp();
       }
-      showToast(`Experience at "${exp.company}" deleted permanently from MongoDB & Portfolio!`);
+      await refreshPortfolioData();
       fetchBackendData();
+      showToast(`Experience at "${exp.company}" deleted permanently from MongoDB & Portfolio!`);
     } catch (err) {
       showToast('Failed to delete experience: ' + err.message, true);
     }
@@ -1002,8 +1101,9 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       if (editingSkillId && String(editingSkillId) === String(sId)) {
         handleCancelEditSkill();
       }
-      showToast(`Skill "${skill.name}" deleted permanently from MongoDB & Portfolio!`);
+      await refreshPortfolioData();
       fetchBackendData();
+      showToast(`Skill "${skill.name}" deleted permanently from MongoDB & Portfolio!`);
     } catch (err) {
       showToast('Failed to delete skill: ' + err.message, true);
     }
@@ -1015,6 +1115,17 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     setIsSubmitting(true);
     try {
       await updateProfilePhotos(photoForm);
+      lastSyncedProfileSigRef.current = JSON.stringify({
+        heroImage: photoForm.heroImage || '',
+        aboutImage: photoForm.aboutImage || '',
+        logoImage: photoForm.logoImage || '',
+        resumeUrl: photoForm.resumeUrl || '',
+        name: photoForm.name || '',
+        title: photoForm.title || '',
+        bioLead: photoForm.bioLead || '',
+      });
+      await refreshPortfolioData();
+      fetchBackendData();
       showToast('Profile and photos updated across Portfolio & MongoDB!');
     } catch (err) {
       showToast('Failed to update photos: ' + err.message, true);
@@ -1037,14 +1148,20 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     }
   };
 
-  const handleDeleteMessage = async (id) => {
+  const handleDeleteMessage = async (idOrMsg) => {
     if (!requireAdminAuth('delete inquiry message')) return;
+    const strId =
+      idOrMsg && typeof idOrMsg === 'object'
+        ? String(idOrMsg.id || idOrMsg._id || '')
+        : String(idOrMsg || '');
     try {
-      setContactMessages((prev) => prev.filter((m) => String(m.id || m._id) !== String(id)));
+      setContactMessages((prev) =>
+        prev.filter((m) => String(m.id || m._id) !== strId && String(m._id || m.id) !== strId)
+      );
       if (deleteContactMessage) {
-        await deleteContactMessage(id);
+        await deleteContactMessage(idOrMsg);
       } else {
-        const res = await fetch(buildApiUrl(`/api/contact/messages/${encodeURIComponent(id)}`), {
+        const res = await fetch(buildApiUrl(`/api/contact/messages/${encodeURIComponent(strId)}`), {
           method: 'DELETE',
           headers: getDeleteHeaders(),
         });
@@ -1052,8 +1169,9 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
           throw new Error('Failed to delete inquiry from database.');
         }
       }
-      showToast('Inquiry deleted permanently from MongoDB!');
+      await refreshPortfolioData();
       fetchBackendData();
+      showToast('Inquiry deleted permanently from MongoDB!');
     } catch (err) {
       fetchContactMessages();
       showToast('Failed to delete message: ' + (err?.message || ''), true);
@@ -1152,12 +1270,14 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
   };
 
   return (
-    <div className="admin-portal-page">
+    <div className={`admin-portal-page admin-theme-${adminTheme}`} data-admin-theme={adminTheme}>
       {/* Top Header Bar */}
       <AdminTopBar
         onNavigateToFrontend={onNavigateToFrontend}
         isBackendConnected={isBackendConnected}
         backendHealth={backendHealth}
+        portfolioPing={portfolioPing}
+        onSelectSystemTab={() => setActiveTab('mongodb')}
         isAdmin={isAdmin}
         currentUser={currentUser}
         dbUser={dbUser}
@@ -1168,6 +1288,8 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         showToast={showToast}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMobileMenuOpen={isMobileMenuOpen}
+        adminTheme={adminTheme}
+        onToggleTheme={handleToggleAdminTheme}
       />
 
       {/* Toast Alert */}
@@ -1690,11 +1812,15 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
           {activeTab === 'seo-generator' && (
             <ProjectSeoGeneratorTab
               projectsList={projectsList}
-              onUpdateProjectSEO={async (projId, seoData) => {
-                if (!requireAdminAuth('save project SEO metadata')) return false;
-                return updateProjectSEO(projId, seoData);
-              }}
+              onUpdateProjectSEO={updateProjectSEO}
               profileConfig={profileConfig}
+              adminTheme={adminTheme}
+              onToggleTheme={handleToggleAdminTheme}
+              backendHealth={backendHealth}
+              portfolioPing={portfolioPing}
+              onRefreshFromDb={async () => {
+                await Promise.all([refreshPortfolioData(), fetchBackendData()]);
+              }}
             />
           )}
 
@@ -2999,6 +3125,8 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
             <MongoInspectorTab
               backendHealth={backendHealth}
               apiStats={apiStats}
+              portfolioPing={portfolioPing}
+              onPingPortfolio={fetchBackendData}
               projectsCount={projectsList.length}
               certificationsCount={certificationsList.length}
               educationCount={educationList.length}

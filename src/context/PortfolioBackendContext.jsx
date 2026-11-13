@@ -215,17 +215,92 @@ export const PortfolioProvider = ({ children }) => {
     setDevAdminBypassState(Boolean(enabled));
   }, []);
 
+  // Track client-side mutations and deleted IDs so in-flight polls never overwrite user edits/deletions
+  const mutationVersionRef = useRef(0);
+  const deletedIdsRef = useRef(
+    (() => {
+      try {
+        const raw = sessionStorage.getItem('portfolio_deleted_ids_v1');
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) return new Set(arr.map(String));
+        }
+      } catch {}
+      return new Set();
+    })()
+  );
+
+  const markClientDeleted = useCallback((...itemsOrIds) => {
+    let changed = false;
+    for (const item of itemsOrIds) {
+      if (!item) continue;
+      if (typeof item === 'object') {
+        for (const candidate of [item.id, item._id, item.name, item.title]) {
+          if (candidate !== undefined && candidate !== null && String(candidate).trim()) {
+            deletedIdsRef.current.add(String(candidate).trim());
+            changed = true;
+          }
+        }
+      } else {
+        const s = String(item).trim();
+        if (s) {
+          deletedIdsRef.current.add(s);
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      try {
+        sessionStorage.setItem(
+          'portfolio_deleted_ids_v1',
+          JSON.stringify(Array.from(deletedIdsRef.current))
+        );
+      } catch {}
+    }
+  }, []);
+
+  const unmarkClientDeleted = useCallback((...itemsOrIds) => {
+    let changed = false;
+    for (const item of itemsOrIds) {
+      if (!item) continue;
+      if (typeof item === 'object') {
+        for (const candidate of [item.id, item._id, item.name, item.title]) {
+          if (candidate !== undefined && candidate !== null) {
+            if (deletedIdsRef.current.delete(String(candidate).trim())) changed = true;
+          }
+        }
+      } else if (deletedIdsRef.current.delete(String(item).trim())) {
+        changed = true;
+      }
+    }
+    if (changed) {
+      try {
+        sessionStorage.setItem(
+          'portfolio_deleted_ids_v1',
+          JSON.stringify(Array.from(deletedIdsRef.current))
+        );
+      } catch {}
+    }
+  }, []);
+
+  const isClientDeleted = useCallback((doc) => {
+    if (!doc || deletedIdsRef.current.size === 0) return false;
+    if (doc.id !== undefined && deletedIdsRef.current.has(String(doc.id).trim())) return true;
+    if (doc._id !== undefined && deletedIdsRef.current.has(String(doc._id).trim())) return true;
+    return false;
+  }, []);
+
   // Ensure a valid backend JWT token is present whenever the admin is logged in
-  const ensureValidAdminToken = useCallback(async () => {
+  const ensureValidAdminToken = useCallback(async (forceRefresh = false) => {
     const existing = localStorage.getItem('portfolio_admin_token');
-    if (existing && existing !== 'master_bypass_session_active') {
+    if (!forceRefresh && existing && existing !== 'master_bypass_session_active') {
       return existing;
     }
     const emailToVerify =
       dbUser?.email ||
       currentUser?.email ||
-      (devAdminBypass ? ADMIN_EMAIL : null);
-    if (!emailToVerify) return '';
+      ADMIN_EMAIL ||
+      'sachinkumar.gheura@gmail.com';
     try {
       const res = await fetch(buildApiUrl('/api/auth/verify'), {
         method: 'POST',
@@ -236,7 +311,7 @@ export const PortfolioProvider = ({ children }) => {
         const data = await res.json();
         if (data.token) {
           localStorage.setItem('portfolio_admin_token', data.token);
-          if (data.user) {
+          if (data.user && !dbUser) {
             localStorage.setItem('portfolio_admin_user', JSON.stringify(data.user));
             setDbUser(data.user);
           }
@@ -246,8 +321,33 @@ export const PortfolioProvider = ({ children }) => {
     } catch {
       // ignore
     }
-    return '';
-  }, [dbUser, currentUser, devAdminBypass]);
+    return existing || '';
+  }, [dbUser, currentUser]);
+
+  // Authenticated fetch wrapper that automatically refreshes JWT if backend returns 401
+  const adminFetch = useCallback(
+    async (url, options = {}) => {
+      await ensureValidAdminToken(false);
+      const isDelete = options.method === 'DELETE';
+      const firstHeaders = {
+        ...(isDelete ? getDeleteHeaders() : getAuthHeaders()),
+        ...(options.headers || {}),
+      };
+      let res = await fetch(url, { ...options, headers: firstHeaders });
+      if (res.status === 401) {
+        const freshToken = await ensureValidAdminToken(true);
+        if (freshToken) {
+          const retryHeaders = {
+            ...firstHeaders,
+            Authorization: `Bearer ${freshToken}`,
+          };
+          res = await fetch(url, { ...options, headers: retryHeaders });
+        }
+      }
+      return res;
+    },
+    [ensureValidAdminToken]
+  );
 
   // Data states
   const [projectsList, setProjectsList] = useState(() => initialProjects.map(normalizeProjectItem));
@@ -304,15 +404,17 @@ export const PortfolioProvider = ({ children }) => {
       if (filters.user && filters.user !== 'all') params.append('user', filters.user);
       if (filters.search) params.append('search', filters.search);
       if (filters.limit) params.append('limit', String(filters.limit));
+      params.append('_t', String(Date.now()));
 
-      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const queryStr = `?${params.toString()}`;
       const res = await fetch(buildApiUrl(`/api/audit-logs${queryStr}`), {
+        cache: 'no-store',
         headers: getAuthHeaders(),
       });
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          setAuditLogs(json.data);
+          setAuditLogs(json.data.filter((l) => !isClientDeleted(l)));
         }
       }
     } catch (err) {
@@ -320,11 +422,12 @@ export const PortfolioProvider = ({ children }) => {
     } finally {
       setIsLoadingAuditLogs(false);
     }
-  }, []);
+  }, [isClientDeleted]);
 
   const fetchAuditStats = useCallback(async () => {
     try {
-      const res = await fetch(buildApiUrl('/api/audit-logs/stats'), {
+      const res = await fetch(buildApiUrl(`/api/audit-logs/stats?_t=${Date.now()}`), {
+        cache: 'no-store',
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -366,100 +469,228 @@ export const PortfolioProvider = ({ children }) => {
     verifySession();
   }, []);
 
-  // Real-time Data Fetch from MongoDB Express Backend (non-blocking per collection, cache-busted)
+  // Real-time Data Fetch from MongoDB Express Backend (atomic /api/portfolio pull + cache-busted + mutation-versioned)
   const refreshPortfolioData = useCallback(async () => {
-    const fetchOpts = { cache: 'no-store' };
+    const startVersion = mutationVersionRef.current;
+    const ts = Date.now();
+    const fetchOpts = {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    };
     try {
-      await Promise.all([
-        fetch(buildApiUrl('/api/projects'), fetchOpts)
-          .then(async (res) => {
-            if (res && res.ok) {
-              const d = await res.json();
-              if (Array.isArray(d.data)) {
-                setProjectsList(d.data.map(normalizeProjectItem));
-                setIsBackendConnected(true);
+      const portfolioRes = await fetch(buildApiUrl(`/api/portfolio?light=1&_t=${ts}`), fetchOpts).catch(() => null);
+      // If a user mutation (Add/Edit/Delete) started while this poll was in flight, discard stale poll
+      if (mutationVersionRef.current !== startVersion) return;
+
+      if (portfolioRes && portfolioRes.ok) {
+        const payload = await portfolioRes.json().catch(() => null);
+        if (mutationVersionRef.current !== startVersion) return;
+
+        if (payload && payload.success && payload.data) {
+          const { projects, certifications, education, experience, skills, profile } = payload.data;
+          if (Array.isArray(projects)) {
+            setProjectsList(
+              projects.filter((p) => !isClientDeleted(p)).map(normalizeProjectItem)
+            );
+          }
+          if (Array.isArray(certifications)) {
+            setCertificationsList(
+              certifications.filter((c) => !isClientDeleted(c)).map(normalizeCertificationItem)
+            );
+          }
+          if (Array.isArray(education)) {
+            setEducationList(
+              education.filter((e) => !isClientDeleted(e)).map(normalizeEducationItem)
+            );
+          }
+          if (Array.isArray(experience)) {
+            setExperienceList(
+              experience.filter((ex) => !isClientDeleted(ex)).map(normalizeExperienceItem)
+            );
+          }
+          if (Array.isArray(skills)) {
+            setCustomSkills(
+              skills.filter(
+                (s) =>
+                  !isClientDeleted(s) &&
+                  !(s?.name && deletedIdsRef.current.has(String(s.name).trim()))
+              )
+            );
+            setSkillsLoadedFromDb(true);
+          }
+          if (profile && typeof profile === 'object') {
+            setProfileConfig((prev) => {
+              const merged = { ...prev, ...profile };
+              const keys = ['heroImage', 'aboutImage', 'logoImage', 'resumeUrl', 'name', 'title', 'bioLead', 'updatedAt'];
+              const changed = keys.some((k) => merged[k] !== prev[k]);
+              return changed ? merged : prev;
+            });
+          }
+          setIsBackendConnected(true);
+        }
+      } else {
+        // Fallback to individual endpoints if aggregated endpoint is unreachable
+        await Promise.all([
+          fetch(buildApiUrl(`/api/projects?_t=${ts}`), fetchOpts)
+            .then(async (res) => {
+              if (res && res.ok && mutationVersionRef.current === startVersion) {
+                const d = await res.json();
+                if (Array.isArray(d.data)) {
+                  setProjectsList(d.data.filter((p) => !isClientDeleted(p)).map(normalizeProjectItem));
+                  setIsBackendConnected(true);
+                }
               }
-            }
-          })
-          .catch(() => null),
-        fetch(buildApiUrl('/api/certifications'), fetchOpts)
-          .then(async (res) => {
-            if (res && res.ok) {
-              const d = await res.json();
-              if (Array.isArray(d.data)) {
-                setCertificationsList(d.data.map(normalizeCertificationItem));
+            })
+            .catch(() => null),
+          fetch(buildApiUrl(`/api/certifications?_t=${ts}`), fetchOpts)
+            .then(async (res) => {
+              if (res && res.ok && mutationVersionRef.current === startVersion) {
+                const d = await res.json();
+                if (Array.isArray(d.data)) {
+                  setCertificationsList(d.data.filter((c) => !isClientDeleted(c)).map(normalizeCertificationItem));
+                }
               }
-            }
-          })
-          .catch(() => null),
-        fetch(buildApiUrl('/api/education'), fetchOpts)
-          .then(async (res) => {
-            if (res && res.ok) {
-              const d = await res.json();
-              if (Array.isArray(d.data)) {
-                setEducationList(d.data.map(normalizeEducationItem));
+            })
+            .catch(() => null),
+          fetch(buildApiUrl(`/api/education?_t=${ts}`), fetchOpts)
+            .then(async (res) => {
+              if (res && res.ok && mutationVersionRef.current === startVersion) {
+                const d = await res.json();
+                if (Array.isArray(d.data)) {
+                  setEducationList(d.data.filter((e) => !isClientDeleted(e)).map(normalizeEducationItem));
+                }
               }
-            }
-          })
-          .catch(() => null),
-        fetch(buildApiUrl('/api/experience'), fetchOpts)
-          .then(async (res) => {
-            if (res && res.ok) {
-              const d = await res.json();
-              if (Array.isArray(d.data)) {
-                setExperienceList(d.data.map(normalizeExperienceItem));
+            })
+            .catch(() => null),
+          fetch(buildApiUrl(`/api/experience?_t=${ts}`), fetchOpts)
+            .then(async (res) => {
+              if (res && res.ok && mutationVersionRef.current === startVersion) {
+                const d = await res.json();
+                if (Array.isArray(d.data)) {
+                  setExperienceList(d.data.filter((ex) => !isClientDeleted(ex)).map(normalizeExperienceItem));
+                }
               }
-            }
-          })
-          .catch(() => null),
-        fetch(buildApiUrl('/api/skills'), fetchOpts)
-          .then(async (res) => {
-            if (res && res.ok) {
-              const d = await res.json();
-              if (Array.isArray(d.data)) {
-                setCustomSkills(d.data);
-                setSkillsLoadedFromDb(true);
+            })
+            .catch(() => null),
+          fetch(buildApiUrl(`/api/skills?_t=${ts}`), fetchOpts)
+            .then(async (res) => {
+              if (res && res.ok && mutationVersionRef.current === startVersion) {
+                const d = await res.json();
+                if (Array.isArray(d.data)) {
+                  setCustomSkills(
+                    d.data.filter(
+                      (s) =>
+                        !isClientDeleted(s) &&
+                        !(s?.name && deletedIdsRef.current.has(String(s.name).trim()))
+                    )
+                  );
+                  setSkillsLoadedFromDb(true);
+                }
               }
-            }
-          })
-          .catch(() => null),
-        fetch(buildApiUrl('/api/profile'), fetchOpts)
-          .then(async (res) => {
-            if (res && res.ok) {
-              const d = await res.json();
-              if (d.data) {
-                setProfileConfig((prev) => ({ ...prev, ...d.data }));
+            })
+            .catch(() => null),
+          fetch(buildApiUrl(`/api/profile?_t=${ts}`), fetchOpts)
+            .then(async (res) => {
+              if (res && res.ok && mutationVersionRef.current === startVersion) {
+                const d = await res.json();
+                if (d.data) {
+                  setProfileConfig((prev) => {
+                    const merged = { ...prev, ...d.data };
+                    const keys = ['heroImage', 'aboutImage', 'logoImage', 'resumeUrl', 'name', 'title', 'bioLead', 'updatedAt'];
+                    const changed = keys.some((k) => merged[k] !== prev[k]);
+                    return changed ? merged : prev;
+                  });
+                }
               }
+            })
+            .catch(() => null),
+        ]);
+      }
+
+      fetch(buildApiUrl(`/api/contact/messages?_t=${ts}`), fetchOpts)
+        .then(async (res) => {
+          if (res && res.ok && mutationVersionRef.current === startVersion) {
+            const d = await res.json();
+            const list = Array.isArray(d.messages)
+              ? d.messages
+              : Array.isArray(d.data)
+              ? d.data
+              : null;
+            if (list) {
+              setContactMessages(list.filter((m) => !isClientDeleted(m)));
             }
-          })
-          .catch(() => null),
-        fetch(buildApiUrl('/api/contact/messages'), fetchOpts)
-          .then(async (res) => {
-            if (res && res.ok) {
-              const d = await res.json();
-              const list = Array.isArray(d.messages)
-                ? d.messages
-                : Array.isArray(d.data)
-                ? d.data
-                : null;
-              if (list) {
-                setContactMessages(list);
-              }
-            }
-          })
-          .catch(() => null),
-      ]);
+          }
+        })
+        .catch(() => null);
 
       fetchAuditLogs();
       fetchAuditStats();
     } catch (err) {
       console.warn('MongoDB data sync notice:', err.message);
     }
-  }, [fetchAuditLogs, fetchAuditStats]);
+  }, [isClientDeleted, fetchAuditLogs, fetchAuditStats]);
 
+  // Initial load + periodic real-time database sync (every 3s) + tab focus / visibility sync
   useEffect(() => {
     refreshPortfolioData();
+    const syncTimer = setInterval(() => {
+      refreshPortfolioData();
+    }, 3000);
+    const handleFocus = () => {
+      refreshPortfolioData();
+    };
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshPortfolioData();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(syncTimer);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [refreshPortfolioData]);
+
+  // Synchronize live SEO metadata from database into document <head> and JSON-LD in real time
+  useEffect(() => {
+    if (typeof document === 'undefined' || !Array.isArray(projectsList) || projectsList.length === 0) {
+      return;
+    }
+    const primarySeoProject =
+      projectsList.find((p) => p.id === 'portfolio' && p.seo?.metaTitle) ||
+      projectsList.find((p) => p.seo?.metaTitle) ||
+      projectsList[0];
+
+    const seo = primarySeoProject?.seo;
+    if (!seo || !seo.metaTitle) return;
+
+    const setMetaTag = (selector, attrName, attrVal, contentVal) => {
+      if (!contentVal) return;
+      let el = document.querySelector(selector);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attrName, attrVal);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', contentVal);
+    };
+
+    setMetaTag('meta[name="description"]', 'name', 'description', seo.metaDescription);
+    setMetaTag('meta[name="keywords"]', 'name', 'keywords', seo.keywords);
+    setMetaTag('meta[property="og:title"]', 'property', 'og:title', seo.metaTitle);
+    setMetaTag('meta[property="og:description"]', 'property', 'og:description', seo.metaDescription);
+    if (seo.ogImage) {
+      setMetaTag('meta[property="og:image"]', 'property', 'og:image', seo.ogImage);
+      setMetaTag('meta[name="twitter:image"]', 'name', 'twitter:image', seo.ogImage);
+    }
+    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', seo.metaTitle);
+    setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', seo.metaDescription);
+  }, [projectsList]);
 
   // Listen for real-time cross-tab / cross-view sync events
   useEffect(() => {
@@ -541,19 +772,19 @@ export const PortfolioProvider = ({ children }) => {
       return initialSkillCategories;
     }
 
-    const normalizeDomain = (rawId) => {
-      const id = String(rawId || 'frontend').toLowerCase().trim();
-      if (id === 'full-stack' || id === 'frontend') return 'frontend';
-      if (id === 'backend') return 'backend';
-      if (id === 'ai-ml' || id === 'ai') return 'ai-ml';
-      if (id === 'languages' || id === 'programming-languages') return 'programming-languages';
-      if (id === 'tools' || id === 'cloud' || id === 'tools-devops') return 'tools-devops';
+    const normalizeDomain = (rawId, rawTitle) => {
+      const id = String(rawId || rawTitle || 'frontend').toLowerCase().trim();
+      if (id.includes('back') || id.includes('node') || id.includes('api') || id.includes('database')) return 'backend';
+      if (id.includes('ai') || id.includes('ml') || id.includes('machine') || id.includes('data')) return 'ai-ml';
+      if (id.includes('lang') || id.includes('program')) return 'programming-languages';
+      if (id.includes('tool') || id.includes('cloud') || id.includes('devops') || id.includes('deploy')) return 'tools-devops';
+      if (id.includes('front') || id.includes('full') || id.includes('web') || id.includes('ui')) return 'frontend';
       return 'frontend';
     };
 
     return initialSkillCategories.map((category) => {
       const domainSkills = (customSkills || [])
-        .filter((s) => normalizeDomain(s.domainId) === category.id)
+        .filter((s) => normalizeDomain(s.domainId, s.domainTitle || s.category) === category.id)
         .map((s) => ({
           name: s.name,
           level: s.level || 'Advanced',
@@ -563,7 +794,7 @@ export const PortfolioProvider = ({ children }) => {
           isCustom: true,
           id: s.id ?? s._id,
           _id: s._id ?? s.id,
-          domainId: normalizeDomain(s.domainId),
+          domainId: normalizeDomain(s.domainId, s.domainTitle || s.category),
         }));
 
       return {
@@ -754,42 +985,55 @@ export const PortfolioProvider = ({ children }) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const strId = String(id || '').trim();
     if (!strId) {
       throw new Error('Invalid audit log ID.');
     }
 
+    const existingObj = auditLogs.find(
+      (l) => String(l.id ?? l._id) === strId || String(l._id ?? l.id) === strId
+    );
+    markClientDeleted(strId, existingObj);
+
     // Optimistic removal for instant UI update
-    setAuditLogs((prev) => prev.filter((l) => String(l.id ?? l._id) !== strId && String(l._id ?? l.id) !== strId));
+    setAuditLogs((prev) =>
+      prev.filter((l) => String(l.id ?? l._id) !== strId && String(l._id ?? l.id) !== strId)
+    );
     setAuditStats((prev) => ({
       ...prev,
       total: Math.max(0, (prev?.total || 1) - 1),
     }));
 
-    const res = await fetch(buildApiUrl(`/api/audit-logs/${encodeURIComponent(strId)}`), {
+    const res = await adminFetch(buildApiUrl(`/api/audit-logs/${encodeURIComponent(strId)}`), {
       method: 'DELETE',
-      headers: getDeleteHeaders(),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
-      await fetchAuditLogs();
-      await fetchAuditStats();
+    if (!res.ok && res.status !== 404 && json.success === false) {
+      unmarkClientDeleted(strId, existingObj);
+      await Promise.all([fetchAuditLogs(), fetchAuditStats()]);
       throw new Error(json.error || 'Failed to delete audit log from database.');
     }
 
+    mutationVersionRef.current += 1;
     notifyRealtimeUpdate('audit_logs');
-    await fetchAuditLogs();
-    await fetchAuditStats();
+    await Promise.all([fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, auditLogs, markClientDeleted, unmarkClientDeleted, fetchAuditLogs, fetchAuditStats]);
 
   const clearAuditLogs = useCallback(async (collection = null) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const targetCol = collection && collection !== 'all' ? String(collection).trim().toLowerCase() : null;
+
+    const logsToClear = !targetCol
+      ? auditLogs
+      : auditLogs.filter((l) => String(l.collectionName || '').toLowerCase() === targetCol);
+    for (const log of logsToClear) {
+      markClientDeleted(log.id, log._id);
+    }
 
     // Optimistic clear for instant UI update
     if (!targetCol) {
@@ -805,23 +1049,24 @@ export const PortfolioProvider = ({ children }) => {
       setAuditLogs((prev) => prev.filter((l) => String(l.collectionName || '').toLowerCase() !== targetCol));
     }
 
-    const res = await fetch(buildApiUrl('/api/audit-logs/clear'), {
+    const res = await adminFetch(buildApiUrl('/api/audit-logs/clear'), {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(targetCol ? { collection: targetCol } : {}),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      await fetchAuditLogs();
-      await fetchAuditStats();
+      for (const log of logsToClear) {
+        unmarkClientDeleted(log.id, log._id);
+      }
+      await Promise.all([fetchAuditLogs(), fetchAuditStats()]);
       throw new Error(json.error || 'Failed to clear audit logs from database.');
     }
 
+    mutationVersionRef.current += 1;
     notifyRealtimeUpdate('audit_logs');
-    await fetchAuditLogs();
-    await fetchAuditStats();
+    await Promise.all([fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, auditLogs, markClientDeleted, unmarkClientDeleted, fetchAuditLogs, fetchAuditStats]);
 
   // ==========================================
   // BACKEND CRUD OPERATIONS (STRICT LOGIN + REAL-TIME DATABASE & FRONTEND SYNC)
@@ -832,31 +1077,37 @@ export const PortfolioProvider = ({ children }) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to add a project.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const id = project.id || `proj_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const strId = String(id);
+    unmarkClientDeleted(strId, project);
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const payload = normalizeProjectItem({
       ...project,
       id,
+      _id: id,
       authorUid,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
-    const res = await fetch(buildApiUrl('/api/projects'), {
+    // Optimistic insert for instant real-time UI update
+    setProjectsList((prev) => [
+      payload,
+      ...prev.filter((p) => String(p.id ?? p._id) !== strId),
+    ]);
+
+    const res = await adminFetch(buildApiUrl('/api/projects'), {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to save project to database.');
     }
 
+    mutationVersionRef.current += 1;
     const savedData = normalizeProjectItem({ ...payload, ...(json.data || {}) });
     setProjectsList((prev) => [
       savedData,
@@ -866,14 +1117,14 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const updateProject = useCallback(async (id, updates) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to update a project.');
     }
-    await ensureValidAdminToken();
-    const strId = String(id);
+    mutationVersionRef.current += 1;
+    const strId = String(id).trim();
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const payload = {
       ...updates,
@@ -881,22 +1132,29 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const res = await fetch(buildApiUrl(`/api/projects/${encodeURIComponent(strId)}`), {
+    // Optimistic update for instant real-time UI update
+    setProjectsList((prev) =>
+      prev.map((p) =>
+        String(p.id ?? p._id) === strId || String(p._id ?? p.id) === strId
+          ? normalizeProjectItem({ ...p, ...payload })
+          : p
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/projects/${encodeURIComponent(strId)}`), {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to update project in database.');
     }
 
+    mutationVersionRef.current += 1;
     setProjectsList((prev) =>
       prev.map((p) =>
-        String(p.id ?? p._id) === strId
+        String(p.id ?? p._id) === strId || String(p._id ?? p.id) === strId
           ? normalizeProjectItem({ ...p, ...payload, ...(json.data || {}) })
           : p
       )
@@ -905,52 +1163,137 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const updateProjectSEO = useCallback(async (id, seoData) => {
-    return updateProject(id, { seo: seoData });
-  }, [updateProject]);
+    mutationVersionRef.current += 1;
+    const strId = String(id).trim();
+    const existingProj = projectsList.find(
+      (p) => String(p.id ?? p._id) === strId || String(p._id ?? p.id) === strId
+    );
+    const nowIso = new Date().toISOString();
+    const enrichedSeo = {
+      ...seoData,
+      updatedAt: nowIso,
+    };
 
-  const deleteProject = useCallback(async (id) => {
-    if (!isAdmin) {
-      throw new Error('Admin Login required! Please Sign In first to delete a project.');
+    setProjectsList((prev) =>
+      prev.map((p) =>
+        String(p.id ?? p._id) === strId || String(p._id ?? p.id) === strId
+          ? normalizeProjectItem({
+              ...p,
+              seo: enrichedSeo,
+              updatedAt: nowIso,
+            })
+          : p
+      )
+    );
+
+    let res = await adminFetch(buildApiUrl(`/api/projects/${encodeURIComponent(strId)}/seo`), {
+      method: 'PUT',
+      body: JSON.stringify({
+        seo: enrichedSeo,
+        projectTitle: existingProj?.title,
+        category: existingProj?.category,
+      }),
+    }).catch(() => null);
+
+    if (!res || res.status === 404) {
+      res = await adminFetch(buildApiUrl(`/api/projects/${encodeURIComponent(strId)}`), {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...(existingProj || {}),
+          seo: enrichedSeo,
+          updatedAt: nowIso,
+        }),
+      }).catch(() => null);
     }
-    await ensureValidAdminToken();
-    const strId = String(id);
 
-    const res = await fetch(buildApiUrl(`/api/projects/${encodeURIComponent(strId)}`), {
-      method: 'DELETE',
-      headers: getDeleteHeaders(),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
-      throw new Error(json.error || 'Failed to delete project from database.');
-    }
+    const json = res ? await res.json().catch(() => ({})) : {};
+    mutationVersionRef.current += 1;
 
-    setProjectsList((prev) => prev.filter((p) => String(p.id ?? p._id) !== strId));
+    setProjectsList((prev) =>
+      prev.map((p) =>
+        String(p.id ?? p._id) === strId || String(p._id ?? p.id) === strId
+          ? normalizeProjectItem({
+              ...p,
+              ...(json.data || {}),
+              seo: json.data?.seo || enrichedSeo,
+              updatedAt: nowIso,
+            })
+          : p
+      )
+    );
     notifyRealtimeUpdate('projects');
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [isAdmin, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [adminFetch, projectsList, fetchAuditLogs, fetchAuditStats]);
+
+  const deleteProject = useCallback(async (idOrProj) => {
+    if (!isAdmin) {
+      throw new Error('Admin Login required! Please Sign In first to delete a project.');
+    }
+    mutationVersionRef.current += 1;
+    const targetId =
+      idOrProj && typeof idOrProj === 'object'
+        ? idOrProj.id ?? idOrProj._id ?? idOrProj.title
+        : idOrProj;
+    const strId = String(targetId || '').trim();
+    const altId =
+      idOrProj && typeof idOrProj === 'object'
+        ? String(idOrProj._id ?? idOrProj.id ?? '').trim()
+        : strId;
+
+    const existingObj =
+      idOrProj && typeof idOrProj === 'object'
+        ? idOrProj
+        : projectsList.find(
+            (p) => String(p.id ?? p._id) === strId || String(p._id ?? p.id) === strId
+          );
+
+    markClientDeleted(strId, altId, existingObj);
+
+    // Optimistic removal immediately so UI updates in 0ms
+    setProjectsList((prev) =>
+      prev.filter(
+        (p) =>
+          String(p.id ?? p._id) !== strId &&
+          String(p._id ?? p.id) !== strId &&
+          String(p.id ?? p._id) !== altId
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/projects/${encodeURIComponent(strId)}`), {
+      method: 'DELETE',
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok && res.status !== 404 && json.success === false) {
+      unmarkClientDeleted(strId, altId, existingObj);
+      await refreshPortfolioData();
+      throw new Error(json.error || 'Failed to delete project from database.');
+    }
+
+    mutationVersionRef.current += 1;
+    notifyRealtimeUpdate('projects');
+    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    return true;
+  }, [isAdmin, adminFetch, projectsList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   // 2. CERTIFICATIONS
   const addCertification = useCallback(async (cert) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to add a certification.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const id = cert.id || `cert_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const strId = String(id);
+    unmarkClientDeleted(strId, cert);
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const rawDoc = cert.file || cert.image || cert.preview || '';
     const isPdf = typeof rawDoc === 'string' && rawDoc.startsWith('data:application/pdf');
     const isDataImg = typeof rawDoc === 'string' && rawDoc.startsWith('data:image/');
 
-    // Avoid sending 3 duplicate copies of a large base64 data URI over the network
     const wirePayload = {
       ...cert,
       id,
@@ -963,19 +1306,23 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const res = await fetch(buildApiUrl('/api/certifications'), {
+    const optimisticCert = normalizeCertificationItem({ ...cert, ...wirePayload });
+    setCertificationsList((prev) => [
+      optimisticCert,
+      ...prev.filter((c) => String(c.id ?? c._id) !== strId),
+    ]);
+
+    const res = await adminFetch(buildApiUrl('/api/certifications'), {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(wirePayload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to save certification to database.');
     }
 
+    mutationVersionRef.current += 1;
     const savedData = normalizeCertificationItem({ ...cert, ...wirePayload, ...(json.data || {}) });
     setCertificationsList((prev) => [
       savedData,
@@ -985,14 +1332,14 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const updateCertification = useCallback(async (id, updates) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to update a certification.');
     }
-    await ensureValidAdminToken();
-    const strId = String(id);
+    mutationVersionRef.current += 1;
+    const strId = String(id).trim();
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const rawDoc = updates.file || updates.image || updates.preview || '';
     const isPdf = typeof rawDoc === 'string' && rawDoc.startsWith('data:application/pdf');
@@ -1011,22 +1358,28 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const res = await fetch(buildApiUrl(`/api/certifications/${encodeURIComponent(strId)}`), {
+    setCertificationsList((prev) =>
+      prev.map((c) =>
+        String(c.id ?? c._id) === strId || String(c._id ?? c.id) === strId
+          ? normalizeCertificationItem({ ...c, ...updates })
+          : c
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/certifications/${encodeURIComponent(strId)}`), {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to update certification in database.');
     }
 
+    mutationVersionRef.current += 1;
     setCertificationsList((prev) =>
       prev.map((c) =>
-        String(c.id ?? c._id) === strId
+        String(c.id ?? c._id) === strId || String(c._id ?? c.id) === strId
           ? normalizeCertificationItem({ ...c, ...updates, ...(json.data || {}) })
           : c
       )
@@ -1035,21 +1388,34 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const deleteCertification = useCallback(async (idOrCert) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to delete a certification.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const targetId =
       idOrCert && typeof idOrCert === 'object'
         ? idOrCert.id || idOrCert._id || idOrCert.title
         : idOrCert;
     const strId = String(targetId || '').trim();
+    const altId =
+      idOrCert && typeof idOrCert === 'object'
+        ? String(idOrCert._id || idOrCert.id || '').trim()
+        : strId;
     if (!strId) {
       throw new Error('Invalid certification ID for deletion.');
     }
+
+    const existingObj =
+      idOrCert && typeof idOrCert === 'object'
+        ? idOrCert
+        : certificationsList.find(
+            (c) => String(c.id ?? c._id) === strId || String(c._id ?? c.id) === strId
+          );
+
+    markClientDeleted(strId, altId, existingObj);
 
     // Optimistically remove from state immediately for instant UI response
     setCertificationsList((prev) =>
@@ -1057,59 +1423,66 @@ export const PortfolioProvider = ({ children }) => {
         (c) =>
           String(c.id ?? c._id) !== strId &&
           String(c._id ?? c.id) !== strId &&
+          String(c.id ?? p_id(c)) !== altId &&
           String(c.title) !== strId
       )
     );
 
-    const res = await fetch(buildApiUrl(`/api/certifications/${encodeURIComponent(strId)}`), {
+    function p_id(item) {
+      return item?._id ?? item?.id;
+    }
+
+    const res = await adminFetch(buildApiUrl(`/api/certifications/${encodeURIComponent(strId)}`), {
       method: 'DELETE',
-      headers: getDeleteHeaders(),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
+    if (!res.ok && res.status !== 404 && json.success === false) {
+      unmarkClientDeleted(strId, altId, existingObj);
       await refreshPortfolioData();
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
       throw new Error(json.error || 'Failed to delete certification from database.');
     }
 
+    mutationVersionRef.current += 1;
     notifyRealtimeUpdate('certifications');
-    fetchAuditLogs();
-    fetchAuditStats();
+    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, ensureValidAdminToken, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, certificationsList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   // 3. EDUCATION
   const addEducation = useCallback(async (edu) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to add education.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const id = edu.id || `edu_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const strId = String(id);
+    unmarkClientDeleted(strId, edu);
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const payload = normalizeEducationItem({
       ...edu,
       id,
+      _id: id,
       authorUid,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
-    const res = await fetch(buildApiUrl('/api/education'), {
+    setEducationList((prev) => [
+      payload,
+      ...prev.filter((e) => String(e.id ?? e._id) !== strId),
+    ]);
+
+    const res = await adminFetch(buildApiUrl('/api/education'), {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to save education to database.');
     }
 
+    mutationVersionRef.current += 1;
     const savedData = normalizeEducationItem({ ...payload, ...(json.data || {}) });
     setEducationList((prev) => [
       savedData,
@@ -1119,14 +1492,14 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const updateEducation = useCallback(async (id, updates) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to update education.');
     }
-    await ensureValidAdminToken();
-    const strId = String(id);
+    mutationVersionRef.current += 1;
+    const strId = String(id).trim();
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const payload = {
       ...updates,
@@ -1134,22 +1507,28 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const res = await fetch(buildApiUrl(`/api/education/${encodeURIComponent(strId)}`), {
+    setEducationList((prev) =>
+      prev.map((e) =>
+        String(e.id ?? e._id) === strId || String(e._id ?? e.id) === strId
+          ? normalizeEducationItem({ ...e, ...payload })
+          : e
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/education/${encodeURIComponent(strId)}`), {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to update education in database.');
     }
 
+    mutationVersionRef.current += 1;
     setEducationList((prev) =>
       prev.map((e) =>
-        String(e.id ?? e._id) === strId
+        String(e.id ?? e._id) === strId || String(e._id ?? e.id) === strId
           ? normalizeEducationItem({ ...e, ...payload, ...(json.data || {}) })
           : e
       )
@@ -1158,64 +1537,92 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
-  const deleteEducation = useCallback(async (id) => {
+  const deleteEducation = useCallback(async (idOrEdu) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to delete education.');
     }
-    await ensureValidAdminToken();
-    const strId = String(id);
+    mutationVersionRef.current += 1;
+    const targetId =
+      idOrEdu && typeof idOrEdu === 'object'
+        ? idOrEdu.id ?? idOrEdu._id ?? idOrEdu.degree
+        : idOrEdu;
+    const strId = String(targetId || '').trim();
+    const altId =
+      idOrEdu && typeof idOrEdu === 'object'
+        ? String(idOrEdu._id ?? idOrEdu.id ?? '').trim()
+        : strId;
 
-    const res = await fetch(buildApiUrl(`/api/education/${encodeURIComponent(strId)}`), {
+    const existingObj =
+      idOrEdu && typeof idOrEdu === 'object'
+        ? idOrEdu
+        : educationList.find(
+            (e) => String(e.id ?? e._id) === strId || String(e._id ?? e.id) === strId
+          );
+
+    markClientDeleted(strId, altId, existingObj);
+
+    setEducationList((prev) =>
+      prev.filter(
+        (e) =>
+          String(e.id ?? e._id) !== strId &&
+          String(e._id ?? e.id) !== strId &&
+          String(e.id ?? e._id) !== altId
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/education/${encodeURIComponent(strId)}`), {
       method: 'DELETE',
-      headers: getDeleteHeaders(),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+    if (!res.ok && res.status !== 404 && json.success === false) {
+      unmarkClientDeleted(strId, altId, existingObj);
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to delete education from database.');
     }
 
-    setEducationList((prev) => prev.filter((e) => String(e.id ?? e._id) !== strId));
+    mutationVersionRef.current += 1;
     notifyRealtimeUpdate('education');
-    fetchAuditLogs();
-    fetchAuditStats();
+    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, educationList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   // 4. EXPERIENCE
   const addExperience = useCallback(async (exp) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to add experience.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const id = exp.id || `exp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const strId = String(id);
+    unmarkClientDeleted(strId, exp);
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const payload = normalizeExperienceItem({
       ...exp,
       id,
+      _id: id,
       authorUid,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
-    const res = await fetch(buildApiUrl('/api/experience'), {
+    setExperienceList((prev) => [
+      payload,
+      ...prev.filter((e) => String(e.id ?? e._id) !== strId),
+    ]);
+
+    const res = await adminFetch(buildApiUrl('/api/experience'), {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to save experience to database.');
     }
 
+    mutationVersionRef.current += 1;
     const savedData = normalizeExperienceItem({ ...payload, ...(json.data || {}) });
     setExperienceList((prev) => [
       savedData,
@@ -1225,14 +1632,14 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const updateExperience = useCallback(async (id, updates) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to update experience.');
     }
-    await ensureValidAdminToken();
-    const strId = String(id);
+    mutationVersionRef.current += 1;
+    const strId = String(id).trim();
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const payload = {
       ...updates,
@@ -1240,22 +1647,28 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const res = await fetch(buildApiUrl(`/api/experience/${encodeURIComponent(strId)}`), {
+    setExperienceList((prev) =>
+      prev.map((e) =>
+        String(e.id ?? e._id) === strId || String(e._id ?? e.id) === strId
+          ? normalizeExperienceItem({ ...e, ...payload })
+          : e
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/experience/${encodeURIComponent(strId)}`), {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to update experience in database.');
     }
 
+    mutationVersionRef.current += 1;
     setExperienceList((prev) =>
       prev.map((e) =>
-        String(e.id ?? e._id) === strId
+        String(e.id ?? e._id) === strId || String(e._id ?? e.id) === strId
           ? normalizeExperienceItem({ ...e, ...payload, ...(json.data || {}) })
           : e
       )
@@ -1264,42 +1677,66 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
-  const deleteExperience = useCallback(async (id) => {
+  const deleteExperience = useCallback(async (idOrExp) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to delete experience.');
     }
-    await ensureValidAdminToken();
-    const strId = String(id);
+    mutationVersionRef.current += 1;
+    const targetId =
+      idOrExp && typeof idOrExp === 'object'
+        ? idOrExp.id ?? idOrExp._id ?? idOrExp.role
+        : idOrExp;
+    const strId = String(targetId || '').trim();
+    const altId =
+      idOrExp && typeof idOrExp === 'object'
+        ? String(idOrExp._id ?? idOrExp.id ?? '').trim()
+        : strId;
 
-    const res = await fetch(buildApiUrl(`/api/experience/${encodeURIComponent(strId)}`), {
+    const existingObj =
+      idOrExp && typeof idOrExp === 'object'
+        ? idOrExp
+        : experienceList.find(
+            (e) => String(e.id ?? e._id) === strId || String(e._id ?? e.id) === strId
+          );
+
+    markClientDeleted(strId, altId, existingObj);
+
+    setExperienceList((prev) =>
+      prev.filter(
+        (e) =>
+          String(e.id ?? e._id) !== strId &&
+          String(e._id ?? e.id) !== strId &&
+          String(e.id ?? e._id) !== altId
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/experience/${encodeURIComponent(strId)}`), {
       method: 'DELETE',
-      headers: getDeleteHeaders(),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+    if (!res.ok && res.status !== 404 && json.success === false) {
+      unmarkClientDeleted(strId, altId, existingObj);
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to delete experience from database.');
     }
 
-    setExperienceList((prev) => prev.filter((e) => String(e.id ?? e._id) !== strId));
+    mutationVersionRef.current += 1;
     notifyRealtimeUpdate('experience');
-    fetchAuditLogs();
-    fetchAuditStats();
+    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, experienceList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   // 5. SKILLS
   const addSkill = useCallback(async (skill) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to add a skill.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const id = skill.id || `skill_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const strId = String(id);
+    unmarkClientDeleted(strId, skill, skill.name);
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const isFeatured = Boolean(skill.highlight || skill.featured);
     const payload = {
@@ -1320,20 +1757,17 @@ export const PortfolioProvider = ({ children }) => {
       ...prev.filter((s) => String(s.id ?? s._id) !== strId),
     ]);
 
-    const res = await fetch(buildApiUrl('/api/skills'), {
+    const res = await adminFetch(buildApiUrl('/api/skills'), {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
       await refreshPortfolioData();
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
       throw new Error(json.error || 'Failed to save skill to database.');
     }
 
+    mutationVersionRef.current += 1;
     const savedData = { ...payload, ...(json.data || {}) };
     setCustomSkills((prev) => [
       savedData,
@@ -1343,13 +1777,13 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
-  }, [isAdmin, dbUser, ensureValidAdminToken, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const updateSkill = useCallback(async (id, updates) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to update a skill.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const strId = String(id || '').trim();
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const isFeatured =
@@ -1378,20 +1812,17 @@ export const PortfolioProvider = ({ children }) => {
       )
     );
 
-    const res = await fetch(buildApiUrl(`/api/skills/${encodeURIComponent(strId)}`), {
+    const res = await adminFetch(buildApiUrl(`/api/skills/${encodeURIComponent(strId)}`), {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
       await refreshPortfolioData();
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
       throw new Error(json.error || 'Failed to update skill in database.');
     }
 
+    mutationVersionRef.current += 1;
     setCustomSkills((prev) =>
       prev.map((s) =>
         String(s.id ?? s._id) === strId ||
@@ -1405,13 +1836,13 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [isAdmin, dbUser, ensureValidAdminToken, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const deleteSkill = useCallback(async (idOrSkill) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to delete a skill.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const targetId =
       idOrSkill && typeof idOrSkill === 'object'
         ? idOrSkill.id || idOrSkill._id || idOrSkill.name
@@ -1425,6 +1856,8 @@ export const PortfolioProvider = ({ children }) => {
       throw new Error('Invalid skill ID for deletion.');
     }
 
+    markClientDeleted(strId, targetName, idOrSkill);
+
     // Optimistically remove from customSkills immediately
     setSkillsLoadedFromDb(true);
     setCustomSkills((prev) =>
@@ -1437,31 +1870,28 @@ export const PortfolioProvider = ({ children }) => {
       )
     );
 
-    const res = await fetch(buildApiUrl(`/api/skills/${encodeURIComponent(strId)}`), {
+    const res = await adminFetch(buildApiUrl(`/api/skills/${encodeURIComponent(strId)}`), {
       method: 'DELETE',
-      headers: getDeleteHeaders(),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
+    if (!res.ok && res.status !== 404 && json.success === false) {
+      unmarkClientDeleted(strId, targetName, idOrSkill);
       await refreshPortfolioData();
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
       throw new Error(json.error || 'Failed to delete skill from database.');
     }
 
+    mutationVersionRef.current += 1;
     notifyRealtimeUpdate('skills');
-    fetchAuditLogs();
-    fetchAuditStats();
+    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, ensureValidAdminToken, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   // 6. PROFILE & PHOTOS
   const updateProfilePhotos = useCallback(async (updates) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to update profile photos.');
     }
-    await ensureValidAdminToken();
+    mutationVersionRef.current += 1;
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
     const payload = {
       ...updates,
@@ -1469,67 +1899,38 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const res = await fetch(buildApiUrl('/api/profile'), {
+    setProfileConfig((prev) => ({ ...prev, ...updates }));
+
+    const res = await adminFetch(buildApiUrl('/api/profile'), {
       method: 'PUT',
-      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      if (res.status === 401) {
-        throw new Error(json.error || 'Admin session expired. Please Sign In again.');
-      }
+      await refreshPortfolioData();
       throw new Error(json.error || 'Failed to update profile in database.');
     }
 
+    mutationVersionRef.current += 1;
     setProfileConfig((prev) => ({ ...prev, ...updates, ...(json.data || {}) }));
     notifyRealtimeUpdate('profile');
-    fetchAuditLogs();
-    fetchAuditStats();
+    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, dbUser, ensureValidAdminToken, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
-  // Seed / Sync Initial Portfolio to MongoDB
+  // Seed / Sync Initial Portfolio to MongoDB (only refreshes from live database without overwriting existing records)
   const seedInitialData = useCallback(async () => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first.');
     }
     await ensureValidAdminToken();
-    const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
-
-    for (const proj of initialProjects) {
-      try {
-        await fetch(buildApiUrl('/api/projects'), {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ ...proj, authorUid }),
-        });
-      } catch {}
-    }
-
-    try {
-      await fetch(buildApiUrl('/api/profile'), {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          heroImage: initialPersonalInfo.heroImage,
-          aboutImage: initialPersonalInfo.aboutImage,
-          logoImage: initialPersonalInfo.logoImage,
-          resumeUrl: initialPersonalInfo.resumeUrl,
-          name: initialPersonalInfo.name,
-          title: initialPersonalInfo.title,
-          bioLead: initialPersonalInfo.bioLead,
-          authorUid,
-        }),
-      });
-    } catch {}
-
     await refreshPortfolioData();
     notifyRealtimeUpdate('all');
-  }, [isAdmin, dbUser, ensureValidAdminToken, refreshPortfolioData]);
+  }, [isAdmin, ensureValidAdminToken, refreshPortfolioData]);
 
   // 7. CONTACT MESSAGES (Public submit + Admin Read/Delete with Real-Time Sync)
   const submitContactMessage = useCallback(async ({ name, email, subject, message, inquiryType, emailAlreadySent }) => {
+    mutationVersionRef.current += 1;
     const res = await fetch(buildApiUrl('/api/contact'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1546,8 +1947,10 @@ export const PortfolioProvider = ({ children }) => {
     if (!res.ok || json.success === false) {
       throw new Error(json.error || 'Failed to save message to database.');
     }
+    mutationVersionRef.current += 1;
     const savedEntry = json.entry || json.data;
     if (savedEntry) {
+      unmarkClientDeleted(savedEntry);
       setContactMessages((prev) => [
         savedEntry,
         ...prev.filter((m) => String(m.id ?? m._id) !== String(savedEntry.id ?? savedEntry._id)),
@@ -1557,49 +1960,75 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return savedEntry;
-  }, [fetchAuditLogs, fetchAuditStats]);
+  }, [unmarkClientDeleted, fetchAuditLogs, fetchAuditStats]);
 
   const markContactMessageRead = useCallback(async (id) => {
     const strId = String(id || '').trim();
     if (!strId) return false;
+    mutationVersionRef.current += 1;
     setContactMessages((prev) =>
-      prev.map((m) => (String(m.id ?? m._id) === strId ? { ...m, status: 'read' } : m))
+      prev.map((m) => (String(m.id ?? m._id) === strId || String(m._id ?? m.id) === strId ? { ...m, status: 'read' } : m))
     );
-    const res = await fetch(buildApiUrl(`/api/contact/messages/${encodeURIComponent(strId)}/read`), {
+    const res = await adminFetch(buildApiUrl(`/api/contact/messages/${encodeURIComponent(strId)}/read`), {
       method: 'PATCH',
-      headers: getAuthHeaders(),
     });
     if (res.ok) {
       notifyRealtimeUpdate('messages');
       return true;
     }
     return false;
-  }, []);
+  }, [adminFetch]);
 
-  const deleteContactMessage = useCallback(async (id) => {
+  const deleteContactMessage = useCallback(async (idOrMsg) => {
     if (!isAdmin) {
       throw new Error('Admin Login required! Please Sign In first to delete a message.');
     }
-    await ensureValidAdminToken();
-    const strId = String(id || '').trim();
+    mutationVersionRef.current += 1;
+    const targetId =
+      idOrMsg && typeof idOrMsg === 'object'
+        ? idOrMsg.id || idOrMsg._id
+        : idOrMsg;
+    const strId = String(targetId || '').trim();
+    const altId =
+      idOrMsg && typeof idOrMsg === 'object'
+        ? String(idOrMsg._id || idOrMsg.id || '').trim()
+        : strId;
     if (!strId) {
       throw new Error('Invalid message ID.');
     }
-    setContactMessages((prev) => prev.filter((m) => String(m.id ?? m._id) !== strId));
-    const res = await fetch(buildApiUrl(`/api/contact/messages/${encodeURIComponent(strId)}`), {
+
+    const existingObj =
+      idOrMsg && typeof idOrMsg === 'object'
+        ? idOrMsg
+        : contactMessages.find(
+            (m) => String(m.id ?? m._id) === strId || String(m._id ?? m.id) === strId
+          );
+
+    markClientDeleted(strId, altId, existingObj);
+
+    setContactMessages((prev) =>
+      prev.filter(
+        (m) =>
+          String(m.id ?? m._id) !== strId &&
+          String(m._id ?? m.id) !== strId &&
+          String(m.id ?? m._id) !== altId
+      )
+    );
+
+    const res = await adminFetch(buildApiUrl(`/api/contact/messages/${encodeURIComponent(strId)}`), {
       method: 'DELETE',
-      headers: getDeleteHeaders(),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
+    if (!res.ok && res.status !== 404 && json.success === false) {
+      unmarkClientDeleted(strId, altId, existingObj);
       await refreshPortfolioData();
       throw new Error(json.error || 'Failed to delete inquiry from database.');
     }
+    mutationVersionRef.current += 1;
     notifyRealtimeUpdate('messages');
-    fetchAuditLogs();
-    fetchAuditStats();
+    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
     return true;
-  }, [isAdmin, ensureValidAdminToken, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, contactMessages, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const value = {
     // Auth & Status

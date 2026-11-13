@@ -38,8 +38,20 @@
     "status": "Completed",
     "id": "portfolio",
     "authorUid": "sachin@portfolio",
-    "createdAt": "2026-11-11T12:08:38.726Z",
-    "updatedAt": "2026-11-11T12:08:38.726Z"
+    "createdAt": "2026-11-13T09:25:00.481Z",
+    "updatedAt": "2026-11-13T09:25:00.481Z",
+    "seo": {
+      "metaTitle": "Portfolio Website | Sachin Kumar Portfolio",
+      "metaDescription": "Portfolio Website: A personal portfolio website to showcase my projects, skills, and experience with a modern and responsive design. Built by Sachin Kumar...",
+      "keywords": "Portfolio Website, Frontend & UI Engineering, HTML, CSS3, JavaScript, Responsive Design, React, Sachin Kumar, Software Engineer Portfolio",
+      "canonicalUrl": "https://sachin2501.github.io/portfolio_website.io/",
+      "ogImage": "/images/My_portfolio.png",
+      "twitterCard": "summary_large_image",
+      "robots": "index, follow",
+      "schemaType": "WebApplication",
+      "author": "Sachin Kumar",
+      "updatedAt": "2026-11-13T09:32:03.206Z"
+    }
   },
   {
     "_id": "food-delivery",
@@ -83,8 +95,20 @@
     "status": "Completed",
     "id": "food-delivery",
     "authorUid": "sachin@portfolio",
-    "createdAt": "2026-11-11T12:08:39.438Z",
-    "updatedAt": "2026-11-11T12:08:39.438Z"
+    "createdAt": "2026-11-13T09:25:00.741Z",
+    "updatedAt": "2026-11-13T09:25:00.741Z",
+    "seo": {
+      "metaTitle": "Food Delivery App | Sachin Kumar Portfolio",
+      "metaDescription": "Food Delivery App: Full-stack food delivery platform with live order tracking, multiple payment options, and efficient delivery management system. Built by...",
+      "keywords": "Food Delivery App, Full Stack & MERN Architecture, MongoDB, React, Express, JavaScript, Node.js, MERN, Sachin Kumar, Software Engineer Portfolio",
+      "canonicalUrl": "https://food-app-client-frontend.vercel.app/",
+      "ogImage": "/images/Food_Delivery_App.png",
+      "twitterCard": "summary_large_image",
+      "robots": "index, follow",
+      "schemaType": "WebApplication",
+      "author": "Sachin Kumar",
+      "updatedAt": "2026-11-13T09:32:03.206Z"
+    }
   },
   {
     "_id": "sign-language",
@@ -128,7 +152,19 @@
     "status": "Completed",
     "id": "sign-language",
     "authorUid": "sachin@portfolio",
-    "createdAt": "2026-11-11T12:08:40.130Z",
-    "updatedAt": "2026-11-11T12:08:40.130Z"
+    "createdAt": "2026-11-13T09:25:01.010Z",
+    "updatedAt": "2026-11-13T09:25:01.010Z",
+    "seo": {
+      "metaTitle": "Sign Language Detection using Deep Learning | Sachin Kumar Portfolio",
+      "metaDescription": "Sign Language Detection using Deep Learning: Real-time sign language detection system using deep learning to convert hand gestures into text with high accu...",
+      "keywords": "Sign Language Detection using Deep Learning, Computer Vision & AI/ML, AI/ML, Python, Deep Learning, TensorFlow, OpenCV, NumPy, Sachin Kumar, Software Engineer Portfolio",
+      "canonicalUrl": "https://www.linkedin.com/in/sachin-kumar-sharma2501/details/projects/526323928/multiple-media-viewer?profileId=ACoAAFExRwEBBj88OgurA3PVc3CGPo-ywb60RLg&treasuryMediaId=1746430531629&type=DOCUMENT&lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_projects_details%3BstDBS%2FN0TjiLUAa9L7DB3Q%3D%3D",
+      "ogImage": "/images/Deep_Learning.jpg",
+      "twitterCard": "summary_large_image",
+      "robots": "index, follow",
+      "schemaType": "SoftwareApplication",
+      "author": "Sachin Kumar",
+      "updatedAt": "2026-11-13T09:32:03.206Z"
+    }
   }
 ]

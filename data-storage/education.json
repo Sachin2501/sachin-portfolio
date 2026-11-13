@@ -29,7 +29,7 @@
     "_id": "bsc-math",
     "id": "bsc-math",
     "degree": "Bachelor of Science in Mathematics",
-    "duration": "2020 - 2023",
+    "duration": "2023",
     "institute": "Magadh University Bodh Gaya",
     "grade": "Percentage: 66.5%",
     "status": "Completed (First Class)",
@@ -49,6 +49,37 @@
       "Numerical Methods"
     ],
     "createdAt": "2026-11-09T11:58:41.908Z",
-    "updatedAt": "2026-11-09T11:58:41.908Z"
+    "updatedAt": "2026-11-13T08:45:21.535Z",
+    "authorUid": "sachin@portfolio",
+    "company": "Magadh University Bodh Gaya",
+    "courses": [
+      "Linear Algebra",
+      "Calculus",
+      "Probability",
+      "Statistics",
+      "Numerical Methods"
+    ],
+    "description": [
+      "Comprehensive study of Linear Algebra, Differential Calculus, Probability, and Numerical Analysis.",
+      "Rigorous analytical foundation leveraged directly in Neural Network math and Machine Learning algorithms.",
+      "Graduated with First Class distinction in Mathematics."
+    ],
+    "details": [
+      "Comprehensive study of Linear Algebra, Differential Calculus, Probability, and Numerical Analysis.",
+      "Rigorous analytical foundation leveraged directly in Neural Network math and Machine Learning algorithms.",
+      "Graduated with First Class distinction in Mathematics."
+    ],
+    "institution": "Magadh University Bodh Gaya",
+    "location": "India",
+    "period": "2023",
+    "tech": [
+      "Linear Algebra",
+      "Calculus",
+      "Probability",
+      "Statistics",
+      "Numerical Methods"
+    ],
+    "title": "Bachelor of Science in Mathematics",
+    "year": "2023"
   }
 ]

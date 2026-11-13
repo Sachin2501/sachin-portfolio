@@ -53,9 +53,15 @@ export const Experience = ({ onSelectCertificate }) => {
         <div className="certifications-container">
           {filteredGroups.map((group) => {
             const groupExp = (experienceList || []).filter((e) => {
-              const cat = String(e.category || 'web').toLowerCase();
-              if (group.key === 'ai') return cat === 'ai';
-              return cat !== 'ai';
+              const cat = String(e.category || 'web').toLowerCase().trim();
+              const isAi =
+                cat === 'ai' ||
+                cat.includes('ai') ||
+                cat.includes('ml') ||
+                cat.includes('machine') ||
+                cat.includes('data');
+              if (group.key === 'ai') return isAi;
+              return !isAi;
             });
             if (groupExp.length === 0) return null;
 

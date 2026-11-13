@@ -17,8 +17,13 @@ export const globalApiLimiter = rateLimit({
     timestamp: new Date().toISOString(),
   },
   skip: (req) => {
-    // Health check endpoint is exempted so server monitors don't trip limits
-    return req.path === '/health';
+    // Exempt read/health/polling GET endpoints so real-time sync & monitors never trip limits
+    return (
+      req.method === 'GET' ||
+      req.path === '/health' ||
+      req.path === '/portfolio' ||
+      req.path === '/stats'
+    );
   },
 });
 

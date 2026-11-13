@@ -56,15 +56,53 @@ export const MessageModel = {
 
 export const ProfileModel = {
   get: async () => {
-    const doc = await db.profile.findOne({ id: 'config' });
-    return doc || (await db.profile.find())[0] || null;
+    const all = await db.profile.find();
+    if (!Array.isArray(all) || all.length === 0) return null;
+    // Prefer the canonical 'config' document, or the most recently updated document
+    const configDocs = all.filter((p) => p.id === 'config' || String(p._id) === 'config');
+    const pool = configDocs.length > 0 ? configDocs : all;
+    const sorted = [...pool].sort(
+      (a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+    );
+    return sorted[0] || null;
   },
   update: async (updates) => {
-    const existing = await db.profile.findOne({ id: 'config' });
-    if (existing) {
-      return db.profile.updateOne({ id: 'config' }, updates);
+    const all = await db.profile.find();
+    const existing =
+      all.find((p) => p.id === 'config' || String(p._id) === 'config') ||
+      all[0] ||
+      null;
+
+    // Remove any duplicate non-config profile documents so get() is always deterministic
+    if (Array.isArray(all) && all.length > 1) {
+      for (const doc of all) {
+        const docId = String(doc.id || doc._id || '');
+        if (docId && docId !== 'config' && doc !== existing) {
+          await db.profile.findByIdAndDelete(docId).catch(() => {});
+        }
+      }
     }
-    return db.profile.create({ id: 'config', ...updates });
+
+    const cleanUpdates = { ...updates };
+    delete cleanUpdates._id;
+
+    if (existing) {
+      const targetId = existing.id || existing._id || 'config';
+      const updated = await db.profile.findByIdAndUpdate(targetId, {
+        ...existing,
+        ...cleanUpdates,
+        id: 'config',
+        updatedAt: new Date().toISOString(),
+      });
+      if (updated) return updated;
+    }
+    return db.profile.create({
+      ...(existing || {}),
+      ...cleanUpdates,
+      id: 'config',
+      _id: 'config',
+      updatedAt: new Date().toISOString(),
+    });
   },
 };
 

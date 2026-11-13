@@ -6,6 +6,24 @@ import { usePortfolioBackend } from '../../context/PortfolioBackendContext.jsx';
 
 export const About = ({ onOpenResume }) => {
   const { profileConfig } = usePortfolioBackend();
+  const aboutParagraphs = React.useMemo(() => {
+    if (Array.isArray(profileConfig?.about) && profileConfig.about.length > 0) {
+      return profileConfig.about;
+    }
+    if (typeof profileConfig?.about === 'string' && profileConfig.about.trim()) {
+      return profileConfig.about.split('\n').filter(Boolean);
+    }
+    const base = [...(personalInfo.about || [])];
+    if (
+      profileConfig?.bioLead &&
+      profileConfig.bioLead.trim() &&
+      profileConfig.bioLead.trim() !== personalInfo.bioLead.trim()
+    ) {
+      base[0] = profileConfig.bioLead.trim();
+    }
+    return base;
+  }, [profileConfig?.about, profileConfig?.bioLead]);
+
   return (
     <section id="about">
       <SectionTechBackground type="about" />
@@ -18,7 +36,7 @@ export const About = ({ onOpenResume }) => {
               </span>
               <span className="section-title-text">About Me</span>
             </h2>
-            {personalInfo.about.map((paragraph, index) => (
+            {aboutParagraphs.map((paragraph, index) => (
               <h4 key={index}>{paragraph}</h4>
             ))}
             <div className="about-cta-container">
@@ -46,7 +64,7 @@ export const About = ({ onOpenResume }) => {
           <div className="about-image">
             <img
               src={profileConfig?.aboutImage || personalInfo.aboutImage}
-              alt={personalInfo.name}
+              alt={profileConfig?.name || personalInfo.name}
             />
           </div>
         </div>

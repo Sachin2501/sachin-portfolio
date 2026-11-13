@@ -148,23 +148,28 @@ contactRouter.patch('/messages/:id/read', async (req, res) => {
 
 // DELETE inquiry from MongoDB
 contactRouter.delete('/messages/:id', async (req, res) => {
-  const id = decodeURIComponent(req.params.id || '');
+  const id = decodeURIComponent(req.params.id || '').trim();
   try {
     const existing = await MessageModel.findById(id);
     const deleted = await MessageModel.findByIdAndDelete(id);
-    if (deleted) {
+    if (existing?.id && String(existing.id) !== id) {
+      await MessageModel.findByIdAndDelete(String(existing.id));
+    }
+    if (existing?._id && String(existing._id) !== id) {
+      await MessageModel.findByIdAndDelete(String(existing._id));
+    }
+    if (deleted || existing) {
       await recordAuditLog({
         req,
         action: 'DELETE',
         collectionName: 'messages',
-        targetId: id,
+        targetId: existing?._id || existing?.id || id,
         targetTitle: existing?.subject ? `${existing.name || 'Visitor'} — ${existing.subject}` : String(id),
         before: existing || null,
         after: null,
       });
-      return res.json({ success: true, message: 'Inquiry removed from MongoDB database.' });
     }
-    return res.status(404).json({ success: false, error: 'Message not found' });
+    return res.json({ success: true, message: 'Inquiry removed from MongoDB database.' });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

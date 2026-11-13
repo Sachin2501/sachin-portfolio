@@ -147,13 +147,13 @@ export const Navbar = memo(({ activeSection, onNavigate }) => {
               <div className="brand-monogram">
                 <img
                   src={profileConfig?.logoImage || personalInfo.logoImage || '/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png'}
-                  alt={`${personalInfo.name} SK Logo`}
+                  alt={`${profileConfig?.name || personalInfo.name} SK Logo`}
                   className="brand-logo-badge-img"
                   loading="eager"
                 />
               </div>
               <div className="brand-details">
-                <span className="brand-name">{personalInfo.name}</span>
+                <span className="brand-name">{profileConfig?.name || personalInfo.name}</span>
                 <span className="brand-status">
                   <span className="status-pulse-dot" />
                   Available for hire
@@ -250,13 +250,13 @@ export const Navbar = memo(({ activeSection, onNavigate }) => {
             <div className="brand-monogram">
               <img
                 src={profileConfig?.logoImage || personalInfo.logoImage || '/assets/aistudio/Gemini_Generated_Image_hizeznhizeznhize_739e79f3.png'}
-                alt={`${personalInfo.name} SK Logo`}
+                alt={`${profileConfig?.name || personalInfo.name} SK Logo`}
                 className="brand-logo-badge-img"
                 loading="eager"
               />
             </div>
             <div className="brand-details">
-              <span className="brand-name">{personalInfo.name}</span>
+              <span className="brand-name">{profileConfig?.name || personalInfo.name}</span>
               <span className="brand-status">
                 <span className="status-pulse-dot" />
                 Available for hire

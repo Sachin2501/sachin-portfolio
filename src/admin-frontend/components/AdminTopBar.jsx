@@ -12,14 +12,20 @@ import {
   Menu,
   LogIn,
   KeyRound,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { AdminAuthModal } from './AdminAuthModal.jsx';
 import { buildApiUrl } from '../../config/api.js';
+
+import { formatUptimeDuration } from './MongoInspectorTab.jsx';
 
 export const AdminTopBar = ({
   onNavigateToFrontend,
   isBackendConnected,
   backendHealth,
+  portfolioPing,
+  onSelectSystemTab,
   isAdmin,
   currentUser,
   dbUser,
@@ -30,10 +36,29 @@ export const AdminTopBar = ({
   showToast,
   onToggleMobileMenu,
   isMobileMenuOpen,
+  adminTheme = 'dark',
+  onToggleTheme,
 }) => {
   const [showMasterInfo, setShowMasterInfo] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
+
+  const isHealthOnline =
+    backendHealth?.status === 'healthy' ||
+    backendHealth?.ok === true ||
+    portfolioPing?.state === 'online' ||
+    portfolioPing?.state === 'degraded';
+  const pingState = isHealthOnline
+    ? portfolioPing?.state === 'degraded'
+      ? 'degraded'
+      : 'online'
+    : portfolioPing?.state === 'offline' && !isBackendConnected
+    ? 'offline'
+    : isBackendConnected
+    ? 'online'
+    : 'checking';
+  const pingLatency = portfolioPing?.latencyMs;
+  const pingUptime = portfolioPing?.uptimeSeconds || backendHealth?.serverUptimeSeconds || 0;
 
   // Display name for admin
   const adminDisplayName = dbUser
@@ -82,18 +107,71 @@ export const AdminTopBar = ({
           </div>
 
           <div className="admin-status-indicators">
-            <span className={`status-pill ${isBackendConnected ? 'connected' : 'connecting'}`}>
+            <span
+              className={`status-pill ${
+                pingState === 'offline'
+                  ? 'offline'
+                  : isBackendConnected || pingState === 'online' || pingState === 'degraded'
+                  ? 'connected'
+                  : 'connecting'
+              }`}
+            >
               <span className="pulse-indicator" />
-              {isBackendConnected ? 'MongoDB Sync' : 'Connecting...'}
+              {pingState === 'offline'
+                ? 'DB Unreachable'
+                : isBackendConnected || pingState === 'online' || pingState === 'degraded'
+                ? 'MongoDB Sync'
+                : 'Connecting...'}
             </span>
-            <span className="status-pill connected">
+            <button
+              type="button"
+              onClick={onSelectSystemTab}
+              className={`status-pill status-pill-btn ${
+                pingState === 'offline'
+                  ? 'offline'
+                  : pingState === 'degraded'
+                  ? 'connecting'
+                  : 'connected'
+              }`}
+              title={`GET /api/portfolio live telemetry — Status: ${
+                portfolioPing?.statusText || '200 OK'
+              }${pingLatency != null ? ` · Latency: ${pingLatency}ms` : ''}${
+                pingUptime > 0 ? ` · Uptime: ${formatUptimeDuration(pingUptime)}` : ''
+              }. Click to open System Monitor.`}
+            >
               <Server size={12} />
-              API Online
-            </span>
+              <span>
+                {pingState === 'offline'
+                  ? 'API Offline'
+                  : pingLatency != null
+                  ? `API ${pingLatency}ms · Up ${formatUptimeDuration(pingUptime)}`
+                  : 'API Online'}
+              </span>
+            </button>
           </div>
         </div>
 
         <div className="admin-header-right">
+          {/* Theme Mode Toggle (Dark / White Mode) */}
+          {onToggleTheme && (
+            <button
+              type="button"
+              className="btn-admin-theme-toggle"
+              onClick={onToggleTheme}
+              title={
+                adminTheme === 'dark'
+                  ? 'Switch Admin Portal to White (Light) Mode'
+                  : 'Switch Admin Portal to Dark Mode'
+              }
+              aria-label="Toggle Admin Dark/White Mode"
+            >
+              {adminTheme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+              <span className="btn-label-desktop">
+                {adminTheme === 'dark' ? 'White Mode' : 'Dark Mode'}
+              </span>
+            </button>
+          )}
+
           {/* 1. Switch to Live Public Portfolio */}
           <button
             type="button"

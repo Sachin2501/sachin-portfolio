@@ -57,6 +57,7 @@ app.get('/api', (_req, res) => {
     version: '2.1.0',
     documentation: {
       health: 'GET /api/health',
+      portfolio: 'GET /api/portfolio',
       stats: 'GET /api/stats',
       projects: 'GET, POST, PUT, DELETE /api/projects',
       certifications: 'GET, POST, PUT, DELETE /api/certifications',
@@ -69,3 +70,13 @@ app.get('/api', (_req, res) => {
     },
   });
 });
+
+// JSON 404 handler for unmatched /api/* routes (Express 5 compatible)
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `API route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+

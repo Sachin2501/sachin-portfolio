@@ -38,8 +38,8 @@ export const Footer = () => {
                 />
               </div>
               <div className="footer-brand-titles">
-                <span className="footer-brand-name">{personalInfo.name}</span>
-                <span className="footer-brand-role">{personalInfo.title}</span>
+                <span className="footer-brand-name">{profileConfig?.name || personalInfo.name}</span>
+                <span className="footer-brand-role">{profileConfig?.title || personalInfo.title}</span>
               </div>
             </div>
             <p className="footer-short-tagline">
@@ -71,7 +71,7 @@ export const Footer = () => {
         {/* 3. Small Section */}
         <div className="footer-small-section">
           <p className="footer-copyright">
-            &copy; {currentYear} {personalInfo.name}. All rights reserved.
+            &copy; {currentYear} {profileConfig?.name || personalInfo.name}. All rights reserved.
           </p>
           <button
             type="button"

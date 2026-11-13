@@ -21,6 +21,75 @@ import { recordAuditLog } from '../services/auditLogger.js';
 export const portfolioRouter = Router();
 
 // ==========================================
+// 0. AGGREGATED PORTFOLIO PAYLOAD (GET /api/portfolio)
+// ==========================================
+
+function optimizeCertForWire(c) {
+  if (!c || typeof c !== 'object') return c;
+  const clone = { ...c };
+  const certId = encodeURIComponent(String(clone.id || clone._id || ''));
+  if (
+    typeof clone.file === 'string' &&
+    clone.file.startsWith('data:application/pdf') &&
+    clone.file.length > 100000 &&
+    certId
+  ) {
+    clone.file = `/api/certifications/${certId}/file.pdf`;
+    if (!clone.link || clone.link === '#' || clone.link.startsWith('data:application/pdf')) {
+      clone.link = `/api/certifications/${certId}/file.pdf`;
+    }
+  }
+  return clone;
+}
+
+portfolioRouter.get('/portfolio', async (_req, res) => {
+  try {
+    let [projects, certifications, education, experience, skills, profile, messagesCount, dbHealth] =
+      await Promise.all([
+        ProjectModel.find(),
+        CertificationModel.find(),
+        EducationModel.find(),
+        ExperienceModel.find(),
+        SkillModel.find(),
+        ProfileModel.get(),
+        db.messages.countDocuments(),
+        db.getHealth(),
+      ]);
+
+    const cleanExperience = (experience || []).filter((e) => e.role !== 'Senior Full Stack Engineer');
+    const wireCertifications = (certifications || []).map(optimizeCertForWire);
+
+    res.json({
+      success: true,
+      status: 'healthy',
+      endpoint: '/api/portfolio',
+      runtime: 'Node.js ' + process.version,
+      uptimeSeconds: Math.floor(process.uptime()),
+      database: dbHealth,
+      counts: {
+        projects: (projects || []).length,
+        certifications: wireCertifications.length,
+        education: (education || []).length,
+        experience: cleanExperience.length,
+        skills: (skills || []).length,
+        messages: messagesCount || 0,
+      },
+      data: {
+        profile: profile || {},
+        projects: projects || [],
+        experience: cleanExperience,
+        skills: skills || [],
+        certifications: wireCertifications,
+        education: education || [],
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, status: 'error', error: err.message });
+  }
+});
+
+// ==========================================
 // 1. PROJECTS (MongoDB Read: Public | Write: Authenticated Admin Only)
 // ==========================================
 
@@ -58,7 +127,7 @@ portfolioRouter.post('/projects', authenticateAdmin, async (req, res) => {
     });
 
     // Audit Log: Track who created the project
-    recordAuditLog({
+    await recordAuditLog({
       req,
       action: 'CREATE',
       collectionName: 'projects',
@@ -81,13 +150,32 @@ portfolioRouter.post('/projects', authenticateAdmin, async (req, res) => {
 // Protected: UPDATE Project (Restricted to authenticated admin)
 portfolioRouter.put('/projects/:id', authenticateAdmin, async (req, res) => {
   try {
-    // Capture existing project state before update for audit diff
-    const existing = await ProjectModel.findById(req.params.id);
-    if (!existing) {
-      return res.status(404).json({ success: false, error: 'Project not found in database.' });
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    let existing = await ProjectModel.findById(rawId);
+
+    // Fallback: match by title if ID format changed between seed and Atlas
+    if (!existing && req.body?.title) {
+      const allProjects = await ProjectModel.find();
+      existing =
+        allProjects.find(
+          (p) =>
+            String(p.title || '').toLowerCase() ===
+            String(req.body.title || '').toLowerCase()
+        ) || null;
     }
 
-    const validation = validateProject({ ...existing, ...req.body }, true);
+    const mergedCandidate = {
+      title: existing?.title || req.body?.title || 'Portfolio Project',
+      description:
+        existing?.description ||
+        req.body?.description ||
+        'Full-stack software engineering project by Sachin Kumar.',
+      category: existing?.category || req.body?.category || 'Full Stack & MERN Architecture',
+      ...(existing || {}),
+      ...(req.body || {}),
+    };
+
+    const validation = validateProject(mergedCandidate, true);
     if (!validation.isValid) {
       return res.status(400).json({
         success: false,
@@ -96,25 +184,33 @@ portfolioRouter.put('/projects/:id', authenticateAdmin, async (req, res) => {
       });
     }
 
+    const resolvedId = existing?.id || existing?._id || rawId;
     const updates = {
-      ...existing,
+      ...(existing || {}),
       ...req.body,
       ...validation.value,
-      id: existing.id || req.params.id,
-      _id: existing._id || req.params.id,
+      ...(req.body?.seo ? { seo: req.body.seo } : existing?.seo ? { seo: existing.seo } : {}),
+      id: resolvedId,
+      _id: existing?._id || resolvedId,
       updatedAt: new Date().toISOString(),
     };
 
-    const updated = await ProjectModel.findByIdAndUpdate(req.params.id, updates);
+    let updated = await ProjectModel.findByIdAndUpdate(resolvedId, updates);
+    if (!updated) {
+      updated = await ProjectModel.create({
+        ...updates,
+        createdAt: existing?.createdAt || new Date().toISOString(),
+      });
+    }
+
     if (updated) {
-      // Audit Log: Track who edited the project and what changed
       const modifiedFields = Object.keys(req.body || {});
-      recordAuditLog({
+      await recordAuditLog({
         req,
         action: 'UPDATE',
         collectionName: 'projects',
-        targetId: req.params.id,
-        targetTitle: updated.title || existing.title,
+        targetId: resolvedId,
+        targetTitle: updated.title || existing?.title || resolvedId,
         before: existing,
         after: updated,
         modifiedFields,
@@ -122,7 +218,7 @@ portfolioRouter.put('/projects/:id', authenticateAdmin, async (req, res) => {
 
       return res.json({
         success: true,
-        message: `Project updated in MongoDB successfully.`,
+        message: `Project "${updated.title}" updated in MongoDB successfully.`,
         data: updated,
       });
     }
@@ -134,29 +230,139 @@ portfolioRouter.put('/projects/:id', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Real-Time SEO Metadata Endpoints (GET /api/seo & PUT /api/projects/:id/seo)
+portfolioRouter.get('/seo', async (_req, res) => {
+  try {
+    const [projects, profile, dbHealth] = await Promise.all([
+      ProjectModel.find(),
+      ProfileModel.get(),
+      db.getHealth(),
+    ]);
+    const seoRecords = (projects || []).map((p) => ({
+      id: p.id || p._id,
+      title: p.title,
+      category: p.category,
+      seo: p.seo || null,
+      updatedAt: p.updatedAt || null,
+    }));
+    res.json({
+      success: true,
+      database: dbHealth,
+      profileSeo: profile?.seo || null,
+      projectsCount: seoRecords.length,
+      syncedSeoCount: seoRecords.filter((r) => r.seo && r.seo.metaTitle).length,
+      data: seoRecords,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+portfolioRouter.put('/projects/:id/seo', authenticateAdmin, async (req, res) => {
+  try {
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    const seoPayload = req.body?.seo || req.body || {};
+    let existing = await ProjectModel.findById(rawId);
+
+    if (!existing && req.body?.projectTitle) {
+      const allProjects = await ProjectModel.find();
+      existing =
+        allProjects.find(
+          (p) =>
+            String(p.title || '').toLowerCase() ===
+            String(req.body.projectTitle || '').toLowerCase()
+        ) || null;
+    }
+
+    const resolvedId = existing?.id || existing?._id || rawId;
+    const nowIso = new Date().toISOString();
+    const sanitizedSeo = {
+      metaTitle: String(seoPayload.metaTitle || existing?.title || 'Portfolio Project').trim(),
+      metaDescription: String(seoPayload.metaDescription || existing?.description || '').trim(),
+      keywords: String(seoPayload.keywords || '').trim(),
+      canonicalUrl: String(seoPayload.canonicalUrl || '').trim(),
+      ogImage: String(seoPayload.ogImage || existing?.image || '/images/My_portfolio.png').trim(),
+      twitterCard: String(seoPayload.twitterCard || 'summary_large_image').trim(),
+      robots: String(seoPayload.robots || 'index, follow').trim(),
+      schemaType: String(seoPayload.schemaType || 'WebApplication').trim(),
+      author: String(seoPayload.author || 'Sachin Kumar').trim(),
+      updatedAt: nowIso,
+    };
+
+    let updated = null;
+    if (existing) {
+      updated = await ProjectModel.findByIdAndUpdate(resolvedId, {
+        ...existing,
+        seo: sanitizedSeo,
+        updatedAt: nowIso,
+      });
+    } else {
+      updated = await ProjectModel.create({
+        id: resolvedId,
+        _id: resolvedId,
+        title: req.body?.projectTitle || sanitizedSeo.metaTitle.split('–')[0].trim() || resolvedId,
+        description: sanitizedSeo.metaDescription || 'Portfolio Project',
+        category: req.body?.category || 'Full Stack & MERN Architecture',
+        image: sanitizedSeo.ogImage || '/images/My_portfolio.png',
+        technologies: ['React', 'Node.js', 'MongoDB'],
+        seo: sanitizedSeo,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+    }
+
+    await recordAuditLog({
+      req,
+      action: 'UPDATE',
+      collectionName: 'projects',
+      targetId: resolvedId,
+      targetTitle: `${updated?.title || resolvedId} (SEO & Social Meta)`,
+      before: existing,
+      after: updated,
+      modifiedFields: ['seo', 'updatedAt'],
+    });
+
+    const dbHealth = await db.getHealth();
+    return res.json({
+      success: true,
+      message: `SEO metadata for "${updated?.title || resolvedId}" synced in real-time to MongoDB (${dbHealth.databaseName})!`,
+      data: updated,
+      database: dbHealth,
+      timestamp: nowIso,
+    });
+  } catch (err) {
+    console.error('[MongoDB PUT /projects/:id/seo Error]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Protected: DELETE Project (Restricted to authenticated admin)
 portfolioRouter.delete('/projects/:id', authenticateAdmin, async (req, res) => {
   try {
-    // Capture project state before deletion for audit trail
-    const existing = await ProjectModel.findById(req.params.id);
-    const deleted = await ProjectModel.findByIdAndDelete(req.params.id);
-    if (deleted) {
-      // Audit Log: Track who deleted the project
-      recordAuditLog({
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    const existing = await ProjectModel.findById(rawId);
+    const deleted = await ProjectModel.findByIdAndDelete(rawId);
+    if (existing?.id && String(existing.id) !== rawId) {
+      await ProjectModel.findByIdAndDelete(String(existing.id));
+    }
+    if (existing?._id && String(existing._id) !== rawId) {
+      await ProjectModel.findByIdAndDelete(String(existing._id));
+    }
+    if (deleted || existing) {
+      await recordAuditLog({
         req,
         action: 'DELETE',
         collectionName: 'projects',
-        targetId: req.params.id,
-        targetTitle: existing?.title || req.params.id,
+        targetId: existing?.id || existing?._id || rawId,
+        targetTitle: existing?.title || rawId,
         before: existing,
       });
-
-      return res.json({
-        success: true,
-        message: 'Project deleted permanently from MongoDB database.',
-      });
     }
-    return res.status(404).json({ success: false, error: 'Project not found.' });
+    return res.json({
+      success: true,
+      message: 'Project deleted permanently from MongoDB database.',
+    });
   } catch (err) {
     console.error('[MongoDB DELETE /projects/:id Error]:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -170,9 +376,39 @@ portfolioRouter.delete('/projects/:id', authenticateAdmin, async (req, res) => {
 portfolioRouter.get('/certifications', async (_req, res) => {
   try {
     const certs = await CertificationModel.find();
-    res.json({ success: true, count: certs.length, data: certs });
+    const wireCerts = (certs || []).map(optimizeCertForWire);
+    res.json({ success: true, count: wireCerts.length, data: wireCerts });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Serve large base64 PDF/image certificate directly as binary HTTP stream
+portfolioRouter.get(['/certifications/:id/file.pdf', '/certifications/:id/file'], async (req, res) => {
+  try {
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    const cert = await CertificationModel.findById(rawId);
+    if (!cert) {
+      return res.status(404).send('Certificate not found');
+    }
+    const rawMedia = cert.file || cert.image || cert.preview || '';
+    const match = typeof rawMedia === 'string' ? rawMedia.match(/^data:([^;]+);base64,(.+)$/) : null;
+    if (match) {
+      const mimeType = match[1] || 'application/pdf';
+      const base64Data = match[2];
+      const buf = Buffer.from(base64Data, 'base64');
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', buf.length);
+      res.setHeader('Content-Disposition', 'inline; filename="certificate.pdf"');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.send(buf);
+    }
+    if (typeof rawMedia === 'string' && rawMedia.startsWith('http')) {
+      return res.redirect(rawMedia);
+    }
+    return res.status(404).send('Certificate file not available');
+  } catch (err) {
+    return res.status(500).send(err.message);
   }
 });
 
@@ -193,7 +429,7 @@ portfolioRouter.post('/certifications', authenticateAdmin, async (req, res) => {
       updatedAt: new Date().toISOString(),
     });
 
-    recordAuditLog({
+    await recordAuditLog({
       req,
       action: 'CREATE',
       collectionName: 'certifications',
@@ -214,30 +450,53 @@ portfolioRouter.post('/certifications', authenticateAdmin, async (req, res) => {
 
 portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) => {
   try {
-    const existing = await CertificationModel.findById(req.params.id);
-    if (!existing) {
-      return res.status(404).json({ success: false, error: 'Certification not found' });
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    let existing = await CertificationModel.findById(rawId);
+    if (!existing && req.body?.title) {
+      const allCerts = await CertificationModel.find();
+      existing =
+        allCerts.find(
+          (c) => String(c.title || '').toLowerCase() === String(req.body.title || '').toLowerCase()
+        ) || null;
     }
 
-    const validation = validateCertification({ ...existing, ...req.body }, true);
+    const mergedCandidate = {
+      title: existing?.title || req.body?.title || 'Professional Certification',
+      issuer: existing?.issuer || req.body?.issuer || 'Credential Authority',
+      ...(existing || {}),
+      ...(req.body || {}),
+    };
+
+    const validation = validateCertification(mergedCandidate, true);
     if (!validation.isValid) {
       return res.status(400).json({ success: false, error: validation.errors.join(' ') });
     }
 
-    const updated = await CertificationModel.findByIdAndUpdate(req.params.id, {
-      ...existing,
+    const targetId = existing?.id || existing?._id || rawId;
+    const payload = {
+      ...(existing || {}),
       ...req.body,
       ...validation.value,
-      id: existing.id || req.params.id,
-      _id: existing._id || req.params.id,
-    });
+      id: targetId,
+      _id: existing?._id || targetId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    let updated = await CertificationModel.findByIdAndUpdate(targetId, payload);
+    if (!updated) {
+      updated = await CertificationModel.create({
+        ...payload,
+        createdAt: existing?.createdAt || new Date().toISOString(),
+      });
+    }
+
     if (updated) {
-      recordAuditLog({
+      await recordAuditLog({
         req,
         action: 'UPDATE',
         collectionName: 'certifications',
-        targetId: req.params.id,
-        targetTitle: `${updated.title || existing.title} (${updated.issuer || existing.issuer || 'Credential'})`,
+        targetId,
+        targetTitle: `${updated.title || existing?.title || targetId} (${updated.issuer || existing?.issuer || 'Credential'})`,
         before: existing,
         after: updated,
         modifiedFields: Object.keys(req.body || {}),
@@ -252,20 +511,26 @@ portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) =
 
 portfolioRouter.delete('/certifications/:id', authenticateAdmin, async (req, res) => {
   try {
-    const existing = await CertificationModel.findById(req.params.id);
-    const deleted = await CertificationModel.findByIdAndDelete(req.params.id);
-    if (deleted) {
-      recordAuditLog({
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    const existing = await CertificationModel.findById(rawId);
+    const deleted = await CertificationModel.findByIdAndDelete(rawId);
+    if (existing?.id && String(existing.id) !== rawId) {
+      await CertificationModel.findByIdAndDelete(String(existing.id));
+    }
+    if (existing?._id && String(existing._id) !== rawId) {
+      await CertificationModel.findByIdAndDelete(String(existing._id));
+    }
+    if (deleted || existing) {
+      await recordAuditLog({
         req,
         action: 'DELETE',
         collectionName: 'certifications',
-        targetId: req.params.id,
-        targetTitle: existing ? `${existing.title} (${existing.issuer || 'Credential'})` : req.params.id,
+        targetId: existing?.id || existing?._id || rawId,
+        targetTitle: existing ? `${existing.title} (${existing.issuer || 'Credential'})` : rawId,
         before: existing,
       });
-      return res.json({ success: true, message: 'Certification deleted from MongoDB' });
     }
-    return res.status(404).json({ success: false, error: 'Certification not found' });
+    return res.json({ success: true, message: 'Certification deleted from MongoDB' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -301,7 +566,7 @@ portfolioRouter.post('/education', authenticateAdmin, async (req, res) => {
       updatedAt: new Date().toISOString(),
     });
 
-    recordAuditLog({
+    await recordAuditLog({
       req,
       action: 'CREATE',
       collectionName: 'education',
@@ -318,30 +583,59 @@ portfolioRouter.post('/education', authenticateAdmin, async (req, res) => {
 
 portfolioRouter.put('/education/:id', authenticateAdmin, async (req, res) => {
   try {
-    const existing = await EducationModel.findById(req.params.id);
-    if (!existing) {
-      return res.status(404).json({ success: false, error: 'Record not found' });
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    let existing = await EducationModel.findById(rawId);
+    if (!existing && (req.body?.degree || req.body?.title)) {
+      const allEdu = await EducationModel.find();
+      const targetDeg = String(req.body.degree || req.body.title || '').toLowerCase();
+      existing =
+        allEdu.find(
+          (e) => String(e.degree || e.title || '').toLowerCase() === targetDeg
+        ) || null;
     }
 
-    const validation = validateEducation({ ...existing, ...req.body }, true);
+    const mergedCandidate = {
+      degree: existing?.degree || existing?.title || req.body?.degree || req.body?.title || 'Degree Program',
+      institution:
+        existing?.institution ||
+        existing?.institute ||
+        req.body?.institution ||
+        req.body?.institute ||
+        'Academic Institution',
+      ...(existing || {}),
+      ...(req.body || {}),
+    };
+
+    const validation = validateEducation(mergedCandidate, true);
     if (!validation.isValid) {
       return res.status(400).json({ success: false, error: validation.errors.join(' ') });
     }
 
-    const updated = await EducationModel.findByIdAndUpdate(req.params.id, {
-      ...existing,
+    const targetId = existing?.id || existing?._id || rawId;
+    const payload = {
+      ...(existing || {}),
       ...req.body,
       ...validation.value,
-      id: existing.id || req.params.id,
-      _id: existing._id || req.params.id,
-    });
+      id: targetId,
+      _id: existing?._id || targetId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    let updated = await EducationModel.findByIdAndUpdate(targetId, payload);
+    if (!updated) {
+      updated = await EducationModel.create({
+        ...payload,
+        createdAt: existing?.createdAt || new Date().toISOString(),
+      });
+    }
+
     if (updated) {
-      recordAuditLog({
+      await recordAuditLog({
         req,
         action: 'UPDATE',
         collectionName: 'education',
-        targetId: req.params.id,
-        targetTitle: `${updated.degree || existing.degree} — ${updated.institution || existing.institution}`,
+        targetId,
+        targetTitle: `${updated.degree || existing?.degree || targetId} — ${updated.institution || existing?.institution || ''}`,
         before: existing,
         after: updated,
         modifiedFields: Object.keys(req.body || {}),
@@ -356,20 +650,26 @@ portfolioRouter.put('/education/:id', authenticateAdmin, async (req, res) => {
 
 portfolioRouter.delete('/education/:id', authenticateAdmin, async (req, res) => {
   try {
-    const existing = await EducationModel.findById(req.params.id);
-    const deleted = await EducationModel.findByIdAndDelete(req.params.id);
-    if (deleted) {
-      recordAuditLog({
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    const existing = await EducationModel.findById(rawId);
+    const deleted = await EducationModel.findByIdAndDelete(rawId);
+    if (existing?.id && String(existing.id) !== rawId) {
+      await EducationModel.findByIdAndDelete(String(existing.id));
+    }
+    if (existing?._id && String(existing._id) !== rawId) {
+      await EducationModel.findByIdAndDelete(String(existing._id));
+    }
+    if (deleted || existing) {
+      await recordAuditLog({
         req,
         action: 'DELETE',
         collectionName: 'education',
-        targetId: req.params.id,
-        targetTitle: existing ? `${existing.degree || existing.title} — ${existing.institution || existing.institute}` : req.params.id,
+        targetId: existing?.id || existing?._id || rawId,
+        targetTitle: existing ? `${existing.degree || existing.title} — ${existing.institution || existing.institute}` : rawId,
         before: existing,
       });
-      return res.json({ success: true, message: 'Education record deleted from MongoDB' });
     }
-    return res.status(404).json({ success: false, error: 'Record not found' });
+    return res.json({ success: true, message: 'Education record deleted from MongoDB' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -411,7 +711,7 @@ portfolioRouter.post('/experience', authenticateAdmin, async (req, res) => {
     });
 
     // Audit Log: Track who created the experience record
-    recordAuditLog({
+    await recordAuditLog({
       req,
       action: 'CREATE',
       collectionName: 'experience',
@@ -428,33 +728,55 @@ portfolioRouter.post('/experience', authenticateAdmin, async (req, res) => {
 
 portfolioRouter.put('/experience/:id', authenticateAdmin, async (req, res) => {
   try {
-    // Capture existing experience before update for audit diff
-    const existing = await ExperienceModel.findById(req.params.id);
-    if (!existing) {
-      return res.status(404).json({ success: false, error: 'Experience not found' });
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    let existing = await ExperienceModel.findById(rawId);
+    if (!existing && (req.body?.role || req.body?.title)) {
+      const allExp = await ExperienceModel.find();
+      const targetRole = String(req.body.role || req.body.title || '').toLowerCase();
+      existing =
+        allExp.find(
+          (e) => String(e.role || e.title || '').toLowerCase() === targetRole
+        ) || null;
     }
 
-    const validation = validateExperience({ ...existing, ...req.body }, true);
+    const mergedCandidate = {
+      role: existing?.role || existing?.title || req.body?.role || req.body?.title || 'Software Engineer',
+      company: existing?.company || req.body?.company || 'Organization',
+      ...(existing || {}),
+      ...(req.body || {}),
+    };
+
+    const validation = validateExperience(mergedCandidate, true);
     if (!validation.isValid) {
       return res.status(400).json({ success: false, error: validation.errors.join(' ') });
     }
 
-    const updated = await ExperienceModel.findByIdAndUpdate(req.params.id, {
-      ...existing,
+    const targetId = existing?.id || existing?._id || rawId;
+    const payload = {
+      ...(existing || {}),
       ...req.body,
       ...validation.value,
-      id: existing.id || req.params.id,
-      _id: existing._id || req.params.id,
-    });
+      id: targetId,
+      _id: existing?._id || targetId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    let updated = await ExperienceModel.findByIdAndUpdate(targetId, payload);
+    if (!updated) {
+      updated = await ExperienceModel.create({
+        ...payload,
+        createdAt: existing?.createdAt || new Date().toISOString(),
+      });
+    }
+
     if (updated) {
-      // Audit Log: Track who updated the experience record
       const modifiedFields = Object.keys(req.body || {});
-      recordAuditLog({
+      await recordAuditLog({
         req,
         action: 'UPDATE',
         collectionName: 'experience',
-        targetId: req.params.id,
-        targetTitle: `${updated.role || updated.title || existing.role} at ${updated.company || existing.company}`,
+        targetId,
+        targetTitle: `${updated.role || updated.title || existing?.role || targetId} at ${updated.company || existing?.company || ''}`,
         before: existing,
         after: updated,
         modifiedFields,
@@ -470,23 +792,26 @@ portfolioRouter.put('/experience/:id', authenticateAdmin, async (req, res) => {
 
 portfolioRouter.delete('/experience/:id', authenticateAdmin, async (req, res) => {
   try {
-    // Capture existing experience before deletion for audit trail
-    const existing = await ExperienceModel.findById(req.params.id);
-    const deleted = await ExperienceModel.findByIdAndDelete(req.params.id);
-    if (deleted) {
-      // Audit Log: Track who deleted the experience record
-      recordAuditLog({
+    const rawId = decodeURIComponent(req.params.id || '').trim();
+    const existing = await ExperienceModel.findById(rawId);
+    const deleted = await ExperienceModel.findByIdAndDelete(rawId);
+    if (existing?.id && String(existing.id) !== rawId) {
+      await ExperienceModel.findByIdAndDelete(String(existing.id));
+    }
+    if (existing?._id && String(existing._id) !== rawId) {
+      await ExperienceModel.findByIdAndDelete(String(existing._id));
+    }
+    if (deleted || existing) {
+      await recordAuditLog({
         req,
         action: 'DELETE',
         collectionName: 'experience',
-        targetId: req.params.id,
-        targetTitle: existing ? `${existing.role || existing.title} at ${existing.company}` : req.params.id,
+        targetId: existing?.id || existing?._id || rawId,
+        targetTitle: existing ? `${existing.role || existing.title} at ${existing.company}` : rawId,
         before: existing,
       });
-
-      return res.json({ success: true, message: 'Experience deleted from MongoDB' });
     }
-    return res.status(404).json({ success: false, error: 'Experience not found' });
+    return res.json({ success: true, message: 'Experience deleted from MongoDB' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -612,18 +937,23 @@ portfolioRouter.delete('/skills/:id', authenticateAdmin, async (req, res) => {
     const rawId = decodeURIComponent(req.params.id || '').trim();
     const existing = await SkillModel.findById(rawId);
     const deleted = await SkillModel.findByIdAndDelete(rawId);
-    if (deleted) {
+    if (existing?.id && String(existing.id) !== rawId) {
+      await SkillModel.findByIdAndDelete(String(existing.id));
+    }
+    if (existing?._id && String(existing._id) !== rawId) {
+      await SkillModel.findByIdAndDelete(String(existing._id));
+    }
+    if (deleted || existing) {
       await recordAuditLog({
         req,
         action: 'DELETE',
         collectionName: 'skills',
-        targetId: rawId,
+        targetId: existing?.id || existing?._id || rawId,
         targetTitle: existing ? `${existing.name} (${existing.domainTitle || existing.domainId || 'Skill'})` : rawId,
         before: existing,
       });
-      return res.json({ success: true, message: 'Skill deleted from MongoDB' });
     }
-    return res.status(404).json({ success: false, error: 'Skill not found' });
+    return res.json({ success: true, message: 'Skill deleted from MongoDB' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

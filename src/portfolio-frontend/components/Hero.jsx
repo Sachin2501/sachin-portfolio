@@ -13,9 +13,25 @@ export const Hero = () => {
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 1. Typing animation for "Sachin Kumar" in H1
+  const liveName = profileConfig?.name || personalInfo.name;
+  const liveBioLead = profileConfig?.bioLead || personalInfo.bioLead;
+  const activeSubtitles = React.useMemo(() => {
+    const customTitle = profileConfig?.title?.trim();
+    if (customTitle && !rotatingSubtitles.includes(customTitle)) {
+      return [customTitle, ...rotatingSubtitles];
+    }
+    return rotatingSubtitles;
+  }, [profileConfig?.title]);
+
+  // Reset typing animation when liveName changes in database
   useEffect(() => {
-    const fullName = personalInfo.name;
+    setTypedName('');
+    setIsTypingName(true);
+  }, [liveName]);
+
+  // 1. Typing animation for liveName in H1
+  useEffect(() => {
+    const fullName = liveName;
     let timeout;
 
     if (typedName.length < fullName.length) {
@@ -29,13 +45,13 @@ export const Hero = () => {
     }
 
     return () => clearTimeout(timeout);
-  }, [typedName]);
+  }, [typedName, liveName]);
 
   // 2. Rotating subtitle typing loop
   useEffect(() => {
     if (isTypingName) return;
 
-    const currentString = rotatingSubtitles[subIndex];
+    const currentString = activeSubtitles[subIndex % activeSubtitles.length] || rotatingSubtitles[0];
     let timeout;
 
     if (!isDeleting) {
@@ -58,14 +74,14 @@ export const Hero = () => {
       } else {
         timeout = setTimeout(() => {
           setIsDeleting(false);
-          setSubIndex((subIndex + 1) % rotatingSubtitles.length);
+          setSubIndex((subIndex + 1) % activeSubtitles.length);
           setCharIndex(0);
         }, 300);
       }
     }
 
     return () => clearTimeout(timeout);
-  }, [isTypingName, charIndex, isDeleting, subIndex]);
+  }, [isTypingName, charIndex, isDeleting, subIndex, activeSubtitles]);
 
   const scrollToSection = (id) => {
     const el = document.getElementById(id);
@@ -91,15 +107,15 @@ export const Hero = () => {
           <h1>
             Hi, I'm{' '}
             <span className={isTypingName ? 'typing-text' : ''}>
-              {typedName}
+              {typedName || liveName}
             </span>
           </h1>
 
           <h2>
-            <span>{subtitleText || ' '}</span>
+            <span>{subtitleText || profileConfig?.title || ' '}</span>
           </h2>
 
-          <p>{personalInfo.bioLead}</p>
+          <p>{liveBioLead}</p>
 
           <div>
             <div className="social-links-home">
@@ -140,7 +156,7 @@ export const Hero = () => {
         <div className="hero-image">
           <img
             src={profileConfig?.heroImage || personalInfo.heroImage}
-            alt={personalInfo.name}
+            alt={liveName}
           />
         </div>
       </div>

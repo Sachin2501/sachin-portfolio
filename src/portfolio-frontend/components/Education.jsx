@@ -53,9 +53,10 @@ export const Education = () => {
         <div className="certifications-container">
           {filteredGroups.map((group) => {
             const groupEdu = dynamicEduList.filter((edu) => {
-              const cat = String(edu.category || 'engineering').toLowerCase();
-              if (group.key === 'sciences') return cat === 'sciences';
-              return cat !== 'sciences';
+              const cat = String(edu.category || 'engineering').toLowerCase().trim();
+              const isSci = cat === 'sciences' || cat.includes('science') || cat.includes('math');
+              if (group.key === 'sciences') return isSci;
+              return !isSci;
             });
             if (groupEdu.length === 0) return null;
 

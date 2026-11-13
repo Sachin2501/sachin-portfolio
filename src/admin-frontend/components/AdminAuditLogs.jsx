@@ -18,6 +18,7 @@ import {
   ChevronUp,
   Download,
   FileCode,
+  Inbox,
 } from 'lucide-react';
 
 export const AdminAuditLogs = ({
@@ -40,6 +41,7 @@ export const AdminAuditLogs = ({
     education: { label: 'Education', icon: GraduationCap, colorClass: 'experience' },
     skills: { label: 'Skill', icon: Cpu, colorClass: 'projects' },
     profile: { label: 'Profile', icon: ImageIcon, colorClass: 'experience' },
+    messages: { label: 'Inquiry', icon: Inbox, colorClass: 'projects' },
   };
 
   // Filter logs based on collection, action, and search term
@@ -299,6 +301,22 @@ export const AdminAuditLogs = ({
           >
             <Cpu size={13} />
             <span>Skills ({countByCol('skills')})</span>
+          </button>
+          <button
+            type="button"
+            className={`filter-pill-btn ${collectionFilter === 'profile' ? 'active' : ''}`}
+            onClick={() => setCollectionFilter('profile')}
+          >
+            <ImageIcon size={13} />
+            <span>Profile ({countByCol('profile')})</span>
+          </button>
+          <button
+            type="button"
+            className={`filter-pill-btn ${collectionFilter === 'messages' ? 'active' : ''}`}
+            onClick={() => setCollectionFilter('messages')}
+          >
+            <Inbox size={13} />
+            <span>Inquiries ({countByCol('messages')})</span>
           </button>
         </div>
 

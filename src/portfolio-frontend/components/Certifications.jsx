@@ -59,12 +59,17 @@ export const Certifications = ({ onSelectCertificate }) => {
 
         <div className="certifications-container">
           {filteredGroups.map((group) => {
+            const normalizeCertCategory = (rawCat) => {
+              const cat = String(rawCat || 'web').toLowerCase().trim();
+              if (cat === 'web' || cat.includes('web') || cat.includes('front') || cat.includes('full')) return 'web';
+              if (cat === 'ai' || cat.includes('ai') || cat.includes('ml') || cat.includes('machine') || cat.includes('artificial')) return 'ai';
+              if (cat === 'isro' || cat.includes('isro') || cat.includes('space')) return 'isro';
+              if (cat === 'internship' || cat.includes('intern')) return 'internship';
+              if (knownKeys.includes(cat)) return cat;
+              return 'other';
+            };
             const groupCerts = certificationsList.filter((c) => {
-              const cat = String(c.category || 'web').toLowerCase();
-              if (group.key === 'other') {
-                return cat === 'other' || !knownKeys.includes(cat);
-              }
-              return cat === group.key;
+              return normalizeCertCategory(c.category) === group.key;
             });
             if (groupCerts.length === 0) return null;
 

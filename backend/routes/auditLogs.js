@@ -151,15 +151,20 @@ auditLogsRouter.delete('/:id', authenticateAdmin, async (req, res) => {
     if (!rawId) {
       return res.status(400).json({ success: false, error: 'Audit log ID is required.' });
     }
+    const existing = await AuditLogModel.findById(rawId);
     const deleted = await AuditLogModel.findByIdAndDelete(rawId);
-    if (deleted) {
-      return res.json({
-        success: true,
-        id: rawId,
-        message: 'Audit log entry permanently removed from database.',
-      });
+    if (existing?.id && String(existing.id) !== rawId) {
+      await AuditLogModel.findByIdAndDelete(String(existing.id));
     }
-    return res.status(404).json({ success: false, error: 'Audit log entry not found.' });
+    if (existing?._id && String(existing._id) !== rawId) {
+      await AuditLogModel.findByIdAndDelete(String(existing._id));
+    }
+    return res.json({
+      success: true,
+      id: rawId,
+      alreadyDeleted: !deleted && !existing,
+      message: 'Audit log entry permanently removed from database.',
+    });
   } catch (err) {
     console.error('[DELETE /api/audit-logs/:id Error]:', err);
     return res.status(500).json({ success: false, error: err.message });
