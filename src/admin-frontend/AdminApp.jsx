@@ -24,6 +24,7 @@ import {
   LogIn,
   ShieldCheck,
   Eye,
+  Cpu,
 } from 'lucide-react';
 import { usePortfolioBackend, getDeleteHeaders } from '../context/PortfolioBackendContext.jsx';
 import { personalInfo } from '../data/portfolioData.js';
@@ -36,6 +37,7 @@ import { AdminAuditLogs } from './components/AdminAuditLogs.jsx';
 import { FileUploadZone } from './components/FileUploadZone.jsx';
 import { AdminAuthModal } from './components/AdminAuthModal.jsx';
 import { CertificateModal } from '../portfolio-frontend/components/CertificateModal.jsx';
+import { renderPdfFirstPageToPng } from '../portfolio-frontend/components/PdfCanvasViewer.jsx';
 import { buildApiUrl } from '../config/api.js';
 import './admin.css';
 
@@ -79,6 +81,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     updateProfilePhotos,
     seedInitialData,
     contactMessages: ctxContactMessages,
+    fetchContactMessages: ctxFetchContactMessages,
     markContactMessageRead,
     deleteContactMessage,
     refreshPortfolioData,
@@ -126,8 +129,10 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
   // Backend API metrics state
   const [apiStats, setApiStats] = useState({
     pageViews: 1540,
-    inquiriesCount: 2,
-    unreadInquiries: 1,
+    inquiriesCount: Array.isArray(ctxContactMessages) ? ctxContactMessages.length : 0,
+    unreadInquiries: Array.isArray(ctxContactMessages)
+      ? ctxContactMessages.filter((m) => m.status === 'unread').length
+      : 0,
     serverUptimeSeconds: 0,
     counts: {
       projects: projectsList.length,
@@ -135,10 +140,12 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       education: educationList.length,
       experience: experienceList.length,
       skills: customSkills.length,
-      messages: 2,
+      messages: Array.isArray(ctxContactMessages) ? ctxContactMessages.length : 0,
     },
   });
-  const [contactMessages, setContactMessages] = useState([]);
+  const [contactMessages, setContactMessages] = useState(() =>
+    Array.isArray(ctxContactMessages) ? ctxContactMessages : []
+  );
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [backendHealth, setBackendHealth] = useState({ status: 'checking', runtime: 'Node.js' });
   const [portfolioPing, setPortfolioPing] = useState({
@@ -182,6 +189,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     credentialId: '',
     skills: '',
     image: '',
+    preview: '',
     link: '',
   });
 
@@ -247,15 +255,16 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     return true;
   };
 
-  // Periodic ping to /api/portfolio + /api/stats + /api/health for live latency & uptime
+  // Periodic ping to /api/portfolio?light=1 + /api/stats + /api/health for live latency & uptime
   const fetchBackendData = useCallback(async () => {
     const fetchOpts = { cache: 'no-store' };
     const pingStart = performance.now();
     try {
+      const ts = Date.now();
       const [portfolioRes, statsRes, healthRes] = await Promise.all([
-        fetch(buildApiUrl('/api/portfolio'), fetchOpts).catch(() => null),
-        fetch(buildApiUrl('/api/stats'), fetchOpts).catch(() => null),
-        fetch(buildApiUrl('/api/health'), fetchOpts).catch(() => null),
+        fetch(buildApiUrl(`/api/portfolio?light=1&_t=${ts}`), fetchOpts).catch(() => null),
+        fetch(buildApiUrl(`/api/stats?_t=${ts}`), fetchOpts).catch(() => null),
+        fetch(buildApiUrl(`/api/health?_t=${ts}`), fetchOpts).catch(() => null),
       ]);
       const latencyMs = Math.max(1, Math.round(performance.now() - pingStart));
 
@@ -264,10 +273,23 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       const healthData = healthRes?.ok ? await healthRes.json().catch(() => null) : null;
 
       if (statsData) {
-        setApiStats((prev) => ({ ...prev, ...statsData }));
+        setApiStats((prev) => ({
+          ...prev,
+          ...statsData,
+          counts: pData?.counts || statsData?.counts || prev.counts,
+        }));
+      } else if (pData?.counts) {
+        setApiStats((prev) => ({
+          ...prev,
+          counts: pData.counts,
+          database: pData.database || prev.database,
+        }));
       }
       if (healthData) {
         setBackendHealth(healthData);
+      }
+      if (Array.isArray(pData?.data?.messages) && pData.data.messages.length > 0) {
+        setContactMessages(pData.data.messages);
       }
 
       const portfolioOk = Boolean(portfolioRes && portfolioRes.ok && pData?.success !== false);
@@ -321,33 +343,62 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
   const fetchContactMessages = useCallback(async () => {
     setIsLoadingMessages(true);
     try {
-      await refreshPortfolioData();
+      await Promise.all([
+        ctxFetchContactMessages ? ctxFetchContactMessages() : Promise.resolve(),
+        refreshPortfolioData ? refreshPortfolioData(false) : Promise.resolve(),
+      ]);
     } catch {
       // ignore
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [refreshPortfolioData]);
+  }, [ctxFetchContactMessages, refreshPortfolioData]);
 
-  // Keep local contactMessages synchronized in real-time with PortfolioBackendContext
+  // Keep local contactMessages and apiStats.counts synchronized in real-time with PortfolioBackendContext
   useEffect(() => {
     if (Array.isArray(ctxContactMessages)) {
       setContactMessages(ctxContactMessages);
     }
-  }, [ctxContactMessages]);
+    const unreadCount = Array.isArray(ctxContactMessages)
+      ? ctxContactMessages.filter((m) => m.status === 'unread').length
+      : 0;
+    setApiStats((prev) => ({
+      ...prev,
+      inquiriesCount: Array.isArray(ctxContactMessages) ? ctxContactMessages.length : prev.inquiriesCount,
+      unreadInquiries: unreadCount,
+      counts: {
+        ...(prev.counts || {}),
+        projects: Array.isArray(projectsList) ? projectsList.length : prev.counts?.projects || 0,
+        certifications: Array.isArray(certificationsList) ? certificationsList.length : prev.counts?.certifications || 0,
+        education: Array.isArray(educationList) ? educationList.length : prev.counts?.education || 0,
+        experience: Array.isArray(experienceList) ? experienceList.length : prev.counts?.experience || 0,
+        skills: Array.isArray(customSkills) ? customSkills.length : prev.counts?.skills || 0,
+        messages: Array.isArray(ctxContactMessages) ? ctxContactMessages.length : prev.counts?.messages || 0,
+      },
+    }));
+  }, [
+    ctxContactMessages,
+    projectsList,
+    certificationsList,
+    educationList,
+    experienceList,
+    customSkills,
+  ]);
 
   useEffect(() => {
     fetchBackendData();
     fetchContactMessages();
     const interval = setInterval(() => {
       fetchBackendData();
-      fetchContactMessages();
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [fetchBackendData, fetchContactMessages]);
 
-  // Refresh contact messages and audit logs immediately when switching tabs
+  // Refresh portfolio data, contact messages, and audit logs immediately when switching tabs
   useEffect(() => {
+    if (refreshPortfolioData) {
+      refreshPortfolioData(false);
+    }
     if (activeTab === 'messages' || activeTab === 'dashboard' || activeTab === 'mongodb') {
       fetchContactMessages();
       fetchBackendData();
@@ -356,16 +407,22 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       fetchAuditLogs();
       fetchAuditStats();
     }
-  }, [activeTab, fetchContactMessages, fetchBackendData, fetchAuditLogs, fetchAuditStats]);
+  }, [activeTab, refreshPortfolioData, fetchContactMessages, fetchBackendData, fetchAuditLogs, fetchAuditStats]);
 
   const lastSyncedProfileSigRef = useRef('');
   useEffect(() => {
     if (!profileConfig) return;
+    const cleanMedia = (val, fallback) =>
+      typeof val === 'string' && val.includes('/api/profile/media/') ? fallback : val || fallback;
+    const nextHero = cleanMedia(profileConfig.heroImage, personalInfo.heroImage);
+    const nextAbout = cleanMedia(profileConfig.aboutImage, personalInfo.aboutImage);
+    const nextLogo = cleanMedia(profileConfig.logoImage, personalInfo.logoImage);
+    const nextResume = cleanMedia(profileConfig.resumeUrl, personalInfo.resumeUrl);
     const sig = JSON.stringify({
-      heroImage: profileConfig.heroImage || '',
-      aboutImage: profileConfig.aboutImage || '',
-      logoImage: profileConfig.logoImage || '',
-      resumeUrl: profileConfig.resumeUrl || '',
+      heroImage: nextHero || '',
+      aboutImage: nextAbout || '',
+      logoImage: nextLogo || '',
+      resumeUrl: nextResume || '',
       name: profileConfig.name || '',
       title: profileConfig.title || '',
       bioLead: profileConfig.bioLead || '',
@@ -375,10 +432,10 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
 
     setPhotoForm((prev) => ({
       ...prev,
-      heroImage: profileConfig.heroImage || prev.heroImage,
-      aboutImage: profileConfig.aboutImage || prev.aboutImage,
-      logoImage: profileConfig.logoImage || prev.logoImage,
-      resumeUrl: profileConfig.resumeUrl || prev.resumeUrl,
+      heroImage: nextHero || prev.heroImage,
+      aboutImage: nextAbout || prev.aboutImage,
+      logoImage: nextLogo || prev.logoImage,
+      resumeUrl: nextResume || prev.resumeUrl,
       name: profileConfig.name || prev.name,
       title: profileConfig.title || prev.title,
       bioLead: profileConfig.bioLead || prev.bioLead,
@@ -438,6 +495,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         image: '/images/My_portfolio.png',
         featured: true,
       });
+      await refreshPortfolioData(false);
       fetchBackendData();
     } catch (err) {
       showToast('Error saving project: ' + err.message, true);
@@ -546,7 +604,18 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         ? externalLink
         : '';
 
-      // Avoid duplicating multi-MB base64 strings across 4 separate fields
+      let resolvedPreview =
+        certForm.preview && !certForm.preview.startsWith('data:application/pdf')
+          ? certForm.preview
+          : '';
+      if (isUploadedPdf && !resolvedPreview && uploadedDoc.startsWith('data:application/pdf')) {
+        try {
+          resolvedPreview = (await renderPdfFirstPageToPng(uploadedDoc)) || '';
+        } catch {
+          resolvedPreview = '';
+        }
+      }
+
       const payload = {
         title: certForm.title.trim(),
         issuer: certForm.issuer.trim(),
@@ -555,10 +624,10 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         categoryLabel: certCategoryLabels[catKey] || 'Web Development',
         credentialId: certForm.credentialId.trim() || `SK-${Date.now().toString().slice(-6)}`,
         skills: skillsArray,
-        image: isUploadedPdf ? '' : primaryDoc,
-        file: pdfOrDocFile,
-        preview: '',
-        link: externalLink || (! uploadedDoc.startsWith('data:') ? pdfOrDocFile : ''),
+        image: isUploadedPdf ? resolvedPreview : primaryDoc,
+        file: pdfOrDocFile || primaryDoc,
+        preview: isUploadedPdf ? resolvedPreview : primaryDoc,
+        link: externalLink || (!uploadedDoc.startsWith('data:') ? pdfOrDocFile : ''),
       };
 
       if (editingCertId) {
@@ -578,8 +647,10 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         credentialId: '',
         skills: '',
         image: '',
+        preview: '',
         link: '',
       });
+      await refreshPortfolioData(false);
       fetchBackendData();
     } catch (err) {
       showToast('Error saving certification: ' + err.message, true);
@@ -598,7 +669,8 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     const isFilePdf =
       typeof existingFile === 'string' &&
       (existingFile.startsWith('data:application/pdf') ||
-        existingFile.toLowerCase().endsWith('.pdf'));
+        existingFile.toLowerCase().endsWith('.pdf') ||
+        existingFile.toLowerCase().includes('.pdf?'));
 
     setCertForm({
       title: cert.title || '',
@@ -610,7 +682,8 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       image: isFilePdf && existingFile.startsWith('data:application/pdf')
         ? existingFile
         : existingImg || existingFile || '',
-      link: existingFile || cert.link || '',
+      preview: !existingImg.startsWith('data:application/pdf') ? existingImg : '',
+      link: cert.verifyUrl || cert.link || existingFile || '',
     });
     showToast(`Editing Certificate: "${cert.title}" — Update fields above & click Save Changes.`);
     setTimeout(() => {
@@ -633,6 +706,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       credentialId: '',
       skills: '',
       image: '',
+      preview: '',
       link: '',
     });
   };
@@ -721,6 +795,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         skills: 'C++, Python, Data Structures, Database Systems, AI/ML',
         description: '',
       });
+      await refreshPortfolioData(false);
       fetchBackendData();
     } catch (err) {
       showToast('Failed to save education: ' + err.message, true);
@@ -856,11 +931,18 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
           certFileUrl.startsWith('data:application/pdf') ||
           certFileUrl.toLowerCase().endsWith('.pdf') ||
           certFileUrl.toLowerCase().includes('.pdf?');
-        const existingPreview =
+        let existingPreview =
           expForm.certificatePreview &&
           !expForm.certificatePreview.startsWith('data:application/pdf')
             ? expForm.certificatePreview
             : '';
+        if (isExpPdf && !existingPreview && certFileUrl.startsWith('data:application/pdf')) {
+          try {
+            existingPreview = (await renderPdfFirstPageToPng(certFileUrl)) || '';
+          } catch {
+            existingPreview = '';
+          }
+        }
         payload.certificate = {
           id: expForm.certificateId || `cert_${Date.now()}`,
           title:
@@ -900,6 +982,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         certificateFile: '',
         certificatePreview: '',
       });
+      await refreshPortfolioData(false);
       fetchBackendData();
     } catch (err) {
       showToast('Failed to save experience: ' + err.message, true);
@@ -1057,6 +1140,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         highlight: false,
         featured: false,
       });
+      await refreshPortfolioData(false);
       fetchBackendData();
     } catch (err) {
       showToast('Failed to save skill: ' + err.message, true);
@@ -1404,6 +1488,23 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                   <div className="metric-footer">Verified credentials &amp; badges</div>
                 </div>
 
+                <div
+                  className="metric-card clickable"
+                  onClick={() => setActiveTab('skills')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="metric-header">
+                    <span>Technical Skills</span>
+                    <Cpu size={18} className="text-accent" />
+                  </div>
+                  <div className="metric-value">{totalSkillsCount}</div>
+                  <div className="metric-footer">
+                    <span>
+                      {(customSkills || []).filter((s) => s.highlight || s.featured).length} Core / Featured Skills
+                    </span>
+                  </div>
+                </div>
+
                 <div className="metric-card">
                   <div className="metric-header">
                     <span>Contact Inquiries</span>
@@ -1510,7 +1611,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                             ? 'update'
                             : 'delete';
                         return (
-                          <li key={log.id} className="summary-item">
+                          <li key={log.id || log._id} className="summary-item">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
                               <span className={`admin-audit-action-badge ${actionClass}`}>
                                 {log.action}
@@ -1975,7 +2076,15 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                     label="Certificate Document (Upload PDF or JPG/PNG Image)"
                     allowPdf={true}
                     value={certForm.image}
-                    onChange={(url) => setCertForm({ ...certForm, image: url })}
+                    onChange={(url, meta) =>
+                      setCertForm((prev) => ({
+                        ...prev,
+                        image: url,
+                        preview:
+                          meta?.previewDataUrl ||
+                          (url && !url.startsWith('data:application/pdf') ? url : prev.preview || ''),
+                      }))
+                    }
                     helpText="Upload certificate PDF or Image (JPG/PNG) — PDF viewer opens directly on both Admin & Portfolio"
                   />
                 </div>
@@ -2744,11 +2853,16 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                     label="Internship Certificate Image or PDF (Optional)"
                     allowPdf={true}
                     value={expForm.certificateFile || ''}
-                    onChange={(url) =>
-                      setExpForm({
-                        ...expForm,
+                    onChange={(url, meta) =>
+                      setExpForm((prev) => ({
+                        ...prev,
                         certificateFile: url || '',
-                      })
+                        certificatePreview:
+                          meta?.previewDataUrl ||
+                          (url && !url.startsWith('data:application/pdf')
+                            ? url
+                            : prev.certificatePreview || ''),
+                      }))
                     }
                     helpText="Upload or link the internship completion certificate (PDF or Image) shown on the Experience card"
                   />

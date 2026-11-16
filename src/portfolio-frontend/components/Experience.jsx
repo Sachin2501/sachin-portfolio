@@ -1,11 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Briefcase } from 'lucide-react';
 import { SectionTechBackground } from './SectionTechBackground.jsx';
+import { preloadPdfDocument } from './PdfCanvasViewer.jsx';
+import { preloadCertificateImage } from './CertificateModal.jsx';
 import { usePortfolioBackend } from '../../context/PortfolioBackendContext.jsx';
 
 export const Experience = ({ onSelectCertificate }) => {
   const { experienceList } = usePortfolioBackend();
   const [selectedFilter, setSelectedFilter] = useState('all');
+
+  useEffect(() => {
+    if (!Array.isArray(experienceList) || experienceList.length === 0) return;
+    experienceList.forEach((exp, idx) => {
+      const cert = exp?.certificate;
+      if (!cert) return;
+      const previewUrl =
+        cert.preview ||
+        cert.image ||
+        (typeof cert.file === 'string' && !cert.file.toLowerCase().includes('.pdf')
+          ? cert.file
+          : '');
+      if (previewUrl) {
+        setTimeout(() => {
+          preloadCertificateImage(previewUrl);
+        }, idx * 50);
+      }
+    });
+  }, [experienceList]);
 
   const groups = [
     { key: 'ai', label: 'AI & Machine Learning Internships' },
@@ -129,6 +150,26 @@ export const Experience = ({ onSelectCertificate }) => {
                             <button
                               type="button"
                               className="certificate-view"
+                              onMouseEnter={() => {
+                                const previewUrl = exp.certificate?.preview || exp.certificate?.image;
+                                if (previewUrl) preloadCertificateImage(previewUrl);
+                                const pdfUrl = exp.certificate?.file;
+                                if (pdfUrl && String(pdfUrl).toLowerCase().includes('.pdf')) {
+                                  preloadPdfDocument(pdfUrl).catch(() => {});
+                                }
+                              }}
+                              onFocus={() => {
+                                const previewUrl = exp.certificate?.preview || exp.certificate?.image;
+                                if (previewUrl) preloadCertificateImage(previewUrl);
+                                const pdfUrl = exp.certificate?.file;
+                                if (pdfUrl && String(pdfUrl).toLowerCase().includes('.pdf')) {
+                                  preloadPdfDocument(pdfUrl).catch(() => {});
+                                }
+                              }}
+                              onTouchStart={() => {
+                                const previewUrl = exp.certificate?.preview || exp.certificate?.image;
+                                if (previewUrl) preloadCertificateImage(previewUrl);
+                              }}
                               onClick={() => onSelectCertificate(exp.certificate)}
                               title={`View certificate for ${exp.role || exp.title}`}
                             >

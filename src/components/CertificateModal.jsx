@@ -207,8 +207,43 @@ export const CertificateModal = ({ certificate, onClose }) => {
           </a>
 
           <a
-            href={encodeURI(originalFile)}
-            download
+            href={encodeURI(originalFile || displayImage)}
+            download={`${(certificate.title || 'certificate').replace(/[^a-z0-9]+/gi, '_').toLowerCase()}.pdf`}
+            onClick={async (e) => {
+              const targetUrl = encodeURI(originalFile || displayImage || '');
+              if (!targetUrl || targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) return;
+              e.preventDefault();
+              const safeBase = (certificate.title || 'certificate')
+                .replace(/[^a-z0-9]+/gi, '_')
+                .replace(/^_+|_+$/g, '')
+                .toLowerCase();
+              const ext = targetUrl.toLowerCase().endsWith('.pdf') ? '.pdf' : '.png';
+              const filename = `${safeBase || 'certificate'}${ext}`;
+              try {
+                const res = await fetch(targetUrl);
+                if (res.ok) {
+                  const blob = await res.blob();
+                  const blobUrl = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = blobUrl;
+                  link.download = filename;
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                  return;
+                }
+              } catch {
+                // fallback below
+              }
+              const sep = targetUrl.includes('?') ? '&' : '?';
+              const fallbackLink = document.createElement('a');
+              fallbackLink.href = `${targetUrl}${sep}download=1&filename=${encodeURIComponent(filename)}`;
+              fallbackLink.download = filename;
+              document.body.appendChild(fallbackLink);
+              fallbackLink.click();
+              fallbackLink.remove();
+            }}
             className="btn"
             style={{
               padding: '8px 20px',

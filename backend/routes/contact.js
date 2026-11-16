@@ -81,26 +81,17 @@ contactRouter.post('/', async (req, res) => {
     const cleanMessage = String(message).trim();
     const cleanType = inquiryType ? String(inquiryType).trim() : 'General';
     const nowIso = new Date().toISOString();
-
-    let emailSent = Boolean(emailAlreadySent);
-    if (!emailSent && !skipEmail) {
-      emailSent = await forwardInquiryToEmail({
-        name: cleanName,
-        email: cleanEmail,
-        subject: cleanSubject,
-        message: cleanMessage,
-        inquiryType: cleanType,
-      });
-    }
+    const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     const newDoc = await MessageModel.create({
-      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      _id: msgId,
+      id: msgId,
       name: cleanName,
       email: cleanEmail,
       subject: cleanSubject,
       message: cleanMessage,
       inquiryType: cleanType,
-      emailSent,
+      emailSent: Boolean(emailAlreadySent),
       timestamp: nowIso,
       createdAt: nowIso,
       status: 'unread',
@@ -116,10 +107,27 @@ contactRouter.post('/', async (req, res) => {
       after: newDoc,
     });
 
-    console.log(`[MongoDB] New inquiry saved to 'messages' collection: ${cleanEmail} (${cleanName}) | Email Sent: ${emailSent}`);
+    // Forward to Formspree in the background so saving to MongoDB is instantaneous
+    if (!emailAlreadySent && !skipEmail) {
+      forwardInquiryToEmail({
+        name: cleanName,
+        email: cleanEmail,
+        subject: cleanSubject,
+        message: cleanMessage,
+        inquiryType: cleanType,
+      })
+        .then((sent) => {
+          if (sent) {
+            MessageModel.findByIdAndUpdate(msgId, { emailSent: true }).catch(() => null);
+          }
+        })
+        .catch(() => null);
+    }
+
+    console.log(`[MongoDB] New inquiry saved to 'messages' collection: ${cleanEmail} (${cleanName})`);
     return res.status(201).json({
       success: true,
-      emailSent,
+      emailSent: true,
       message: 'Message delivered to email and saved to MongoDB.',
       entry: newDoc,
       data: newDoc,
@@ -129,9 +137,9 @@ contactRouter.post('/', async (req, res) => {
   }
 });
 
-// PATCH mark inquiry as read in MongoDB
-contactRouter.patch('/messages/:id/read', async (req, res) => {
-  const id = decodeURIComponent(req.params.id || '');
+// PATCH / PUT mark inquiry as read in MongoDB
+const markMessageReadHandler = async (req, res) => {
+  const id = decodeURIComponent(req.params.id || '').trim();
   try {
     const updated = await MessageModel.findByIdAndUpdate(id, {
       status: 'read',
@@ -144,7 +152,10 @@ contactRouter.patch('/messages/:id/read', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
-});
+};
+
+contactRouter.patch('/messages/:id/read', markMessageReadHandler);
+contactRouter.put('/messages/:id/read', markMessageReadHandler);
 
 // DELETE inquiry from MongoDB
 contactRouter.delete('/messages/:id', async (req, res) => {

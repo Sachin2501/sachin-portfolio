@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PdfCanvasViewer } from './PdfCanvasViewer.jsx';
+import { PdfCanvasViewer, preloadPdfDocument } from './PdfCanvasViewer.jsx';
 import { usePortfolioBackend } from '../../context/PortfolioBackendContext.jsx';
 
 export const ResumeModal = ({ isOpen, onClose }) => {
@@ -26,12 +26,22 @@ export const ResumeModal = ({ isOpen, onClose }) => {
 
   const [downloadHref, setDownloadHref] = useState(resumePdfPath);
 
+  // Pre-warm the Resume PDF in memory before the user even clicks the Resume button
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (resumePdfPath) {
+        preloadPdfDocument(resumePdfPath).catch(() => {});
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [resumePdfPath]);
+
   useEffect(() => {
     let createdBlobUrl = null;
     if (resumePdfPath && resumePdfPath.startsWith('data:application/pdf')) {
       try {
         const parts = resumePdfPath.split(',');
-        const base64 = parts.length > 1 ? parts[1] : parts[0];
+        const base64 = parts.length > 1 ? parts.slice(1).join(',') : parts[0];
         const raw = window.atob(base64);
         const bytes = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i++) {
@@ -92,6 +102,39 @@ export const ResumeModal = ({ isOpen, onClose }) => {
   const handleZoomIn = () => setZoom((z) => Math.min(2.2, +(z + 0.2).toFixed(2)));
   const handleZoomOut = () => setZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(2)));
   const handleResetZoom = () => setZoom(1.0);
+
+  const handleDownloadResume = async (e) => {
+    if (!downloadHref) return;
+    if (downloadHref.startsWith('blob:') || downloadHref.startsWith('data:')) {
+      return;
+    }
+    e.preventDefault();
+    const filename = 'Sachin_Kumar_Resume.pdf';
+    try {
+      const res = await fetch(downloadHref);
+      if (res.ok) {
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+        return;
+      }
+    } catch {
+      // Fallback below
+    }
+    const sep = downloadHref.includes('?') ? '&' : '?';
+    const fallbackLink = document.createElement('a');
+    fallbackLink.href = `${downloadHref}${sep}download=1&filename=${encodeURIComponent(filename)}`;
+    fallbackLink.download = filename;
+    document.body.appendChild(fallbackLink);
+    fallbackLink.click();
+    fallbackLink.remove();
+  };
 
   return (
     <div
@@ -335,6 +378,7 @@ export const ResumeModal = ({ isOpen, onClose }) => {
               <PdfCanvasViewer
                 src={resumePdfPath}
                 url={resumePdfPath}
+                previewImage={!imgError ? resumePreviewPath : null}
                 title="Sachin Kumar — Official Resume"
                 onError={() => {
                   if (!imgError) {
@@ -371,6 +415,7 @@ export const ResumeModal = ({ isOpen, onClose }) => {
             <a
               href={downloadHref}
               download="Sachin_Kumar_Resume.pdf"
+              onClick={handleDownloadResume}
               className="btn resume-footer-btn"
               style={{
                 padding: '9px 22px',

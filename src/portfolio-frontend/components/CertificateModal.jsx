@@ -1,5 +1,81 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { PdfCanvasViewer, base64ToUint8Array } from './PdfCanvasViewer.jsx';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import {
+  PdfCanvasViewer,
+  base64ToUint8Array,
+  preloadPdfDocument,
+  renderPdfFirstPageToPng,
+} from './PdfCanvasViewer.jsx';
+
+// Global in-memory image preload & decoded element cache for 0ms instant certificate display
+const PRELOADED_CERT_IMAGES = new Set();
+const PRELOADED_IMAGE_OBJECTS = new Map();
+const PDF_GENERATED_PREVIEW_CACHE = new Map();
+
+const normalizeImageUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.includes('%')) {
+    return trimmed;
+  }
+  return encodeURI(trimmed);
+};
+
+export const isCertificateImagePreloaded = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  const normalized = normalizeImageUrl(rawUrl);
+  return PRELOADED_CERT_IMAGES.has(rawUrl) || PRELOADED_CERT_IMAGES.has(normalized);
+};
+
+export const preloadCertificateImage = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return Promise.resolve(false);
+  const normalized = normalizeImageUrl(rawUrl);
+  if (!normalized || isPdfSource(normalized)) return Promise.resolve(false);
+
+  if (PRELOADED_CERT_IMAGES.has(normalized)) {
+    return Promise.resolve(true);
+  }
+
+  if (PRELOADED_IMAGE_OBJECTS.has(normalized)) {
+    return PRELOADED_IMAGE_OBJECTS.get(normalized).promise;
+  }
+
+  let resolvePromise;
+  const promise = new Promise((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  const img = new Image();
+  img.decoding = 'async';
+
+  const markReady = () => {
+    PRELOADED_CERT_IMAGES.add(rawUrl);
+    PRELOADED_CERT_IMAGES.add(normalized);
+    resolvePromise(true);
+  };
+
+  img.onload = () => {
+    if (typeof img.decode === 'function') {
+      img.decode().then(markReady).catch(markReady);
+    } else {
+      markReady();
+    }
+  };
+
+  img.onerror = () => {
+    PRELOADED_IMAGE_OBJECTS.delete(normalized);
+    resolvePromise(false);
+  };
+
+  PRELOADED_IMAGE_OBJECTS.set(normalized, { img, promise });
+  img.src = normalized;
+
+  if (img.complete && img.naturalWidth > 0) {
+    markReady();
+  }
+
+  return promise;
+};
 
 const isPdfSource = (val) => {
   if (typeof val !== 'string' || !val) return false;
@@ -10,6 +86,22 @@ const isPdfSource = (val) => {
     trimmed.includes('.pdf?') ||
     trimmed.includes('application/pdf')
   );
+};
+
+const derivePreviewFromPdfPath = (pdfPath) => {
+  if (typeof pdfPath !== 'string' || !pdfPath) return '';
+  const trimmed = pdfPath.trim();
+  if (
+    trimmed.startsWith('/certificates/') &&
+    !trimmed.startsWith('/certificates/previews/') &&
+    trimmed.toLowerCase().endsWith('.pdf')
+  ) {
+    const baseName = trimmed.replace(/^\/certificates\//, '').replace(/\.pdf$/i, '');
+    if (baseName) {
+      return `/certificates/previews/${baseName}.png`;
+    }
+  }
+  return '';
 };
 
 const dataUrlToBlobUrl = (dataUrl) => {
@@ -30,11 +122,6 @@ const dataUrlToBlobUrl = (dataUrl) => {
 };
 
 export const CertificateModal = ({ certificate, onClose }) => {
-  const [isZoomed, setIsZoomed] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [preferPdfView, setPreferPdfView] = useState(false);
-
   // Determine available sources
   const rawFile = certificate?.file || certificate?.link || '';
   const rawPreview = certificate?.preview || certificate?.image || '';
@@ -49,7 +136,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
     ? certificate.image
     : '';
 
-  const imageCandidate =
+  const explicitImageCandidate =
     !isPdfSource(rawPreview) && rawPreview
       ? rawPreview
       : !isPdfSource(certificate?.image) && certificate?.image
@@ -58,23 +145,90 @@ export const CertificateModal = ({ certificate, onClose }) => {
       ? rawFile
       : '';
 
-  // Automatically prefer PDF Canvas view if there is no separate image preview or if the uploaded file is a Base64 PDF
+  const derivedImageCandidate =
+    !explicitImageCandidate && pdfCandidate ? derivePreviewFromPdfPath(pdfCandidate) : '';
+
+  const [generatedPdfPreview, setGeneratedPdfPreview] = useState(() =>
+    pdfCandidate ? PDF_GENERATED_PREVIEW_CACHE.get(pdfCandidate) || '' : ''
+  );
+
+  const imageCandidate =
+    explicitImageCandidate || derivedImageCandidate || generatedPdfPreview || '';
+  const activeImageUrl = normalizeImageUrl(imageCandidate || (!hasPdfSource ? rawFile : ''));
+
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(() =>
+    Boolean(activeImageUrl && isCertificateImagePreloaded(activeImageUrl))
+  );
+  const [imageError, setImageError] = useState(false);
+  const [preferPdfView, setPreferPdfView] = useState(false);
+
+  // Sync modal state when certificate changes; keep imageLoaded=true if already preloaded
   useEffect(() => {
     setIsZoomed(false);
-    setImageLoaded(false);
     setImageError(false);
-    if (
-      hasPdfSource &&
-      (!imageCandidate ||
-        pdfCandidate.startsWith('data:application/pdf') ||
-        imageCandidate === pdfCandidate ||
-        imageCandidate === '/certificates/previews/ibm-web-dev.png')
-    ) {
+
+    const cachedGen = pdfCandidate ? PDF_GENERATED_PREVIEW_CACHE.get(pdfCandidate) || '' : '';
+    setGeneratedPdfPreview(cachedGen);
+
+    const nextImg = normalizeImageUrl(
+      explicitImageCandidate || derivedImageCandidate || cachedGen || (!hasPdfSource ? rawFile : '')
+    );
+    const alreadyReady = Boolean(nextImg && isCertificateImagePreloaded(nextImg));
+    setImageLoaded(alreadyReady);
+
+    if (nextImg && !alreadyReady) {
+      preloadCertificateImage(nextImg).then((ok) => {
+        if (ok) setImageLoaded(true);
+      });
+    }
+
+    if (hasPdfSource && pdfCandidate) {
+      if (!nextImg && pdfCandidate.startsWith('data:application/pdf')) {
+        renderPdfFirstPageToPng(pdfCandidate)
+          .then((dataUrl) => {
+            if (dataUrl) {
+              PDF_GENERATED_PREVIEW_CACHE.set(pdfCandidate, dataUrl);
+              PRELOADED_CERT_IMAGES.add(dataUrl);
+              setGeneratedPdfPreview(dataUrl);
+              setImageLoaded(true);
+              setPreferPdfView(false);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
+    if (hasPdfSource && !nextImg) {
       setPreferPdfView(true);
     } else {
       setPreferPdfView(false);
     }
-  }, [certificate, hasPdfSource, imageCandidate, pdfCandidate]);
+  }, [
+    certificate,
+    hasPdfSource,
+    explicitImageCandidate,
+    derivedImageCandidate,
+    pdfCandidate,
+    rawFile,
+  ]);
+
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleImgRef = useCallback(
+    (imgEl) => {
+      if (imgEl) {
+        imgEl.setAttribute('fetchpriority', 'high');
+        if (imgEl.complete && imgEl.naturalWidth > 0) {
+          if (activeImageUrl) {
+            PRELOADED_CERT_IMAGES.add(activeImageUrl);
+          }
+          setImageLoaded(true);
+        }
+      }
+    },
+    [activeImageUrl]
+  );
 
   // Convert Base64 PDF data URL to a Blob URL for clean file download
   const downloadBlobUrl = useMemo(() => {
@@ -83,8 +237,102 @@ export const CertificateModal = ({ certificate, onClose }) => {
     if (target.startsWith('data:')) {
       return dataUrlToBlobUrl(target) || target;
     }
-    return encodeURI(target);
+    return normalizeImageUrl(target);
   }, [hasPdfSource, pdfCandidate, imageCandidate, rawFile]);
+
+  const getDownloadExtension = useCallback(
+    (urlStr) => {
+      const clean = String(urlStr || '').split('?')[0].toLowerCase();
+      if (clean.endsWith('.pdf') || clean.startsWith('data:application/pdf')) return '.pdf';
+      if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) return '.jpg';
+      if (clean.endsWith('.svg')) return '.svg';
+      if (clean.endsWith('.png')) return '.png';
+      return hasPdfSource ? '.pdf' : '.png';
+    },
+    [hasPdfSource]
+  );
+
+  const downloadFileName = useMemo(() => {
+    const target = hasPdfSource ? pdfCandidate : imageCandidate || rawFile;
+    const ext = getDownloadExtension(target);
+    const safeBase = (certificate?.title || 'certificate')
+      .replace(/[^a-z0-9]+/gi, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+    return `${safeBase || 'certificate'}${ext}`;
+  }, [certificate?.title, hasPdfSource, pdfCandidate, imageCandidate, rawFile, getDownloadExtension]);
+
+  const handleDownloadCertificate = useCallback(
+    async (e) => {
+      if (!downloadBlobUrl) return;
+      // If it's already a client-side blob: or data: URL, trigger native download directly
+      if (downloadBlobUrl.startsWith('blob:') || downloadBlobUrl.startsWith('data:')) {
+        return;
+      }
+
+      e.preventDefault();
+      if (isDownloading) return;
+      setIsDownloading(true);
+
+      const triggerBlobSave = (blob, filename) => {
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      };
+
+      try {
+        let response = await fetch(downloadBlobUrl);
+        let finalFilename = downloadFileName;
+
+        // If the PDF file isn't found or returns HTML fallback, fall back to the preview image
+        const contentType = response.headers.get('content-type') || '';
+        if (
+          (!response.ok || contentType.includes('text/html')) &&
+          activeImageUrl &&
+          activeImageUrl !== downloadBlobUrl
+        ) {
+          response = await fetch(activeImageUrl);
+          const safeBase = (certificate?.title || 'certificate')
+            .replace(/[^a-z0-9]+/gi, '_')
+            .replace(/^_+|_+$/g, '')
+            .toLowerCase();
+          finalFilename = `${safeBase || 'certificate'}${getDownloadExtension(activeImageUrl)}`;
+        }
+
+        if (response.ok) {
+          const blob = await response.blob();
+          triggerBlobSave(blob, finalFilename);
+          return;
+        }
+      } catch {
+        // Fallback below
+      } finally {
+        setIsDownloading(false);
+      }
+
+      // Direct server attachment download fallback
+      const sep = downloadBlobUrl.includes('?') ? '&' : '?';
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = `${downloadBlobUrl}${sep}download=1&filename=${encodeURIComponent(downloadFileName)}`;
+      fallbackLink.download = downloadFileName;
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      fallbackLink.remove();
+    },
+    [
+      downloadBlobUrl,
+      downloadFileName,
+      activeImageUrl,
+      certificate?.title,
+      getDownloadExtension,
+      isDownloading,
+    ]
+  );
 
   useEffect(() => {
     return () => {
@@ -115,7 +363,6 @@ export const CertificateModal = ({ certificate, onClose }) => {
   if (!certificate) return null;
 
   const showAsPdf = (preferPdfView && hasPdfSource) || (!imageCandidate && hasPdfSource);
-  const activeImageUrl = imageCandidate || rawFile;
   const externalVerifyLink =
     certificate.link &&
     typeof certificate.link === 'string' &&
@@ -166,7 +413,10 @@ export const CertificateModal = ({ certificate, onClose }) => {
             flexWrap: 'wrap',
           }}
         >
-          <div className="cert-modal-title-wrap" style={{ overflow: 'hidden', paddingRight: '0.25rem', flex: '1 1 200px', minWidth: 0 }}>
+          <div
+            className="cert-modal-title-wrap"
+            style={{ overflow: 'hidden', paddingRight: '0.25rem', flex: '1 1 200px', minWidth: 0 }}
+          >
             <h3
               title={certificate.title}
               style={{
@@ -195,13 +445,24 @@ export const CertificateModal = ({ certificate, onClose }) => {
               {certificate.date ? ` • ${certificate.date}` : ''}
             </p>
           </div>
-          <div className="cert-modal-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+          <div
+            className="cert-modal-header-actions"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}
+          >
             {hasPdfSource && imageCandidate && (
               <button
                 type="button"
                 className="cert-modal-switch-btn"
+                onMouseEnter={() => {
+                  if (pdfCandidate) {
+                    preloadPdfDocument(pdfCandidate).catch(() => {});
+                  }
+                }}
                 onClick={() => {
                   setImageError(false);
+                  if (!showAsPdf && pdfCandidate) {
+                    preloadPdfDocument(pdfCandidate).catch(() => {});
+                  }
                   setPreferPdfView(!showAsPdf);
                 }}
                 style={{
@@ -297,6 +558,9 @@ export const CertificateModal = ({ certificate, onClose }) => {
           {showAsPdf && pdfCandidate ? (
             <PdfCanvasViewer
               src={pdfCandidate}
+              previewImage={
+                imageCandidate && imageCandidate !== pdfCandidate ? activeImageUrl : null
+              }
               title={certificate.title}
               onError={() => {
                 if (imageCandidate && imageCandidate !== pdfCandidate) {
@@ -315,6 +579,7 @@ export const CertificateModal = ({ certificate, onClose }) => {
                     alignItems: 'center',
                     gap: '0.8rem',
                     color: 'var(--text-secondary, #94a3b8)',
+                    pointerEvents: 'none',
                   }}
                 >
                   <i
@@ -327,7 +592,13 @@ export const CertificateModal = ({ certificate, onClose }) => {
 
               {imageError ? (
                 hasPdfSource ? (
-                  <PdfCanvasViewer src={pdfCandidate} title={certificate.title} />
+                  <PdfCanvasViewer
+                    src={pdfCandidate}
+                    previewImage={
+                      imageCandidate && imageCandidate !== pdfCandidate ? activeImageUrl : null
+                    }
+                    title={certificate.title}
+                  />
                 ) : (
                   <div
                     style={{
@@ -382,9 +653,17 @@ export const CertificateModal = ({ certificate, onClose }) => {
                 )
               ) : (
                 <img
+                  ref={handleImgRef}
                   src={activeImageUrl}
                   alt={certificate.title}
-                  onLoad={() => setImageLoaded(true)}
+                  loading="eager"
+                  decoding="async"
+                  onLoad={() => {
+                    if (activeImageUrl) {
+                      PRELOADED_CERT_IMAGES.add(activeImageUrl);
+                    }
+                    setImageLoaded(true);
+                  }}
                   onError={() => {
                     if (hasPdfSource) {
                       setPreferPdfView(true);
@@ -400,8 +679,8 @@ export const CertificateModal = ({ certificate, onClose }) => {
                     borderRadius: '8px',
                     boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
                     border: '1px solid var(--border-color, rgba(148, 163, 184, 0.2))',
-                    transition: 'transform 0.2s ease, width 0.2s ease',
-                    display: imageLoaded ? 'block' : 'none',
+                    transition: 'opacity 0.12s ease, transform 0.2s ease, width 0.2s ease',
+                    opacity: imageLoaded ? 1 : 0,
                     cursor: isZoomed ? 'zoom-out' : 'zoom-in',
                     margin: 'auto',
                   }}
@@ -453,9 +732,8 @@ export const CertificateModal = ({ certificate, onClose }) => {
           {downloadBlobUrl && (
             <a
               href={downloadBlobUrl}
-              download={`${(certificate.title || 'certificate')
-                .replace(/[^a-z0-9]/gi, '_')
-                .toLowerCase()}${hasPdfSource ? '.pdf' : '.png'}`}
+              download={downloadFileName}
+              onClick={handleDownloadCertificate}
               className="btn cert-footer-btn"
               style={{
                 background: 'linear-gradient(135deg, #2563eb, #06b6d4)',
@@ -469,10 +747,13 @@ export const CertificateModal = ({ certificate, onClose }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.5rem',
+                opacity: isDownloading ? 0.8 : 1,
               }}
             >
-              <i className="fas fa-download"></i>
-              Download {hasPdfSource ? 'PDF' : 'Certificate'}
+              <i className={`fas ${isDownloading ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
+              {isDownloading
+                ? 'Downloading...'
+                : `Download ${hasPdfSource ? 'PDF' : 'Certificate'}`}
             </a>
           )}
 

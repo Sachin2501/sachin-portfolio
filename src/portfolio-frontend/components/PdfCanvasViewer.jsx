@@ -1,8 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Document, Page, pdfjs } from 'react-pdf';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+// Configure local worker matching the exact pdfjs version used by react-pdf
+const detectedVersion = pdfjs?.version || '6.3.289';
+pdfjs.GlobalWorkerOptions.workerSrc =
+  detectedVersion === '6.5.438'
+    ? '/pdf.worker.6.5.438.min.mjs'
+    : '/pdf.worker.6.3.289.min.mjs';
+
+// Global in-memory binary & page snapshot caches for instant 0ms re-renders
+const PDF_BINARY_CACHE = new Map();
+const PDF_FETCH_PROMISES = new Map();
+const PDF_PAGE_SNAPSHOT_CACHE = new Map();
 
 /**
  * Convert a base64 data URL or raw base64 string into a Uint8Array
@@ -21,22 +30,88 @@ export const base64ToUint8Array = (dataUrl) => {
 };
 
 /**
- * Render the first page of a PDF to a high-res PNG/JPEG data URL.
+ * Validate %PDF- header and return trimmed Uint8Array
+ */
+const normalizePdfBytes = (rawBytes) => {
+  if (!rawBytes || !rawBytes.length) {
+    throw new Error('Empty PDF document buffer.');
+  }
+  const headerWindow = Math.min(rawBytes.length, 1024);
+  let pdfHeaderOffset = -1;
+  for (let i = 0; i <= headerWindow - 5; i++) {
+    if (
+      rawBytes[i] === 0x25 && // %
+      rawBytes[i + 1] === 0x50 && // P
+      rawBytes[i + 2] === 0x44 && // D
+      rawBytes[i + 3] === 0x46 && // F
+      rawBytes[i + 4] === 0x2d // -
+    ) {
+      pdfHeaderOffset = i;
+      break;
+    }
+  }
+  if (pdfHeaderOffset === -1) {
+    throw new Error('The selected document is not a valid PDF file.');
+  }
+  return pdfHeaderOffset > 0 ? rawBytes.slice(pdfHeaderOffset) : rawBytes;
+};
+
+/**
+ * Asynchronously fetch and cache PDF bytes so opening a modal is instant
+ */
+export const preloadPdfDocument = async (pdfSource) => {
+  if (!pdfSource || typeof pdfSource !== 'string') return null;
+  const cacheKey = pdfSource.startsWith('data:')
+    ? `data:${pdfSource.length}:${pdfSource.slice(0, 64)}`
+    : pdfSource.trim();
+
+  if (PDF_BINARY_CACHE.has(cacheKey)) {
+    return PDF_BINARY_CACHE.get(cacheKey);
+  }
+
+  if (PDF_FETCH_PROMISES.has(cacheKey)) {
+    return PDF_FETCH_PROMISES.get(cacheKey);
+  }
+
+  const promise = (async () => {
+    try {
+      let bytes;
+      if (pdfSource.startsWith('data:')) {
+        bytes = normalizePdfBytes(base64ToUint8Array(pdfSource));
+      } else {
+        const resolvedUrl =
+          !pdfSource.startsWith('blob:') && !pdfSource.includes('%')
+            ? encodeURI(pdfSource)
+            : pdfSource;
+        const response = await fetch(resolvedUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} while loading PDF`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        bytes = normalizePdfBytes(new Uint8Array(arrayBuffer));
+      }
+      PDF_BINARY_CACHE.set(cacheKey, bytes);
+      return bytes;
+    } finally {
+      PDF_FETCH_PROMISES.delete(cacheKey);
+    }
+  })();
+
+  PDF_FETCH_PROMISES.set(cacheKey, promise);
+  return promise;
+};
+
+/**
+ * Render the first page of a PDF to a high-res JPEG data URL (used by Admin uploader)
  */
 export const renderPdfFirstPageToPng = async (pdfSource) => {
   try {
-    let loadingTask;
-    if (typeof pdfSource === 'string' && pdfSource.startsWith('data:')) {
-      const uint8 = base64ToUint8Array(pdfSource);
-      loadingTask = pdfjsLib.getDocument({ data: uint8 });
-    } else {
-      const response = await fetch(pdfSource);
-      const arrayBuffer = await response.arrayBuffer();
-      loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-    }
+    const bytes = await preloadPdfDocument(pdfSource);
+    if (!bytes) return null;
+    const loadingTask = pdfjs.getDocument({ data: bytes.slice(0), verbosity: 0 });
     const pdfDoc = await loadingTask.promise;
     const page = await pdfDoc.getPage(1);
-    const viewport = page.getViewport({ scale: 1.5 });
+    const viewport = page.getViewport({ scale: 1.4 });
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = viewport.width;
@@ -56,85 +131,84 @@ export const renderPdfFirstPageToPng = async (pdfSource) => {
   }
 };
 
-const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
-  const canvasRef = useRef(null);
-  const wrapperRef = useRef(null);
-  const [rendering, setRendering] = useState(true);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [pageDimensions, setPageDimensions] = useState({ width: 794, height: 1123 });
+/**
+ * Error boundary to guarantee react-pdf can never unmount the React tree
+ */
+class PdfErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return undefined;
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
 
-    const updateWidth = () => {
-      if (el.clientWidth) {
-        setContainerWidth(el.clientWidth);
-      }
-    };
-
-    updateWidth();
-
-    if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver(() => {
-        updateWidth();
-      });
-      observer.observe(el);
-      return () => observer.disconnect();
+  componentDidCatch(error) {
+    console.warn('React-PDF boundary caught error, switching to direct PDF.js canvas:', error);
+    if (typeof this.props.onBoundaryError === 'function') {
+      this.props.onBoundaryError(error);
     }
+  }
 
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || null;
+    }
+    return this.props.children;
+  }
+}
+
+/**
+ * Direct PDF.js canvas fallback renderer in case react-pdf fails in any environment
+ */
+const DirectPdfJsCanvasPage = ({ pdfDoc, pageNumber, totalPages, effectiveWidth, cacheKey }) => {
+  const canvasRef = useRef(null);
+  const [rendered, setRendered] = useState(false);
+  const snapshotKey = `${cacheKey}::page_${pageNumber}`;
 
   useEffect(() => {
-    let isCancelled = false;
+    let active = true;
     let renderTask = null;
 
     const renderPage = async () => {
       if (!pdfDoc || !canvasRef.current) return;
-      setRendering(true);
       try {
         const page = await pdfDoc.getPage(pageNumber);
-        if (isCancelled) return;
+        if (!active || !canvasRef.current) return;
 
-        // Calculate high-DPI render scale for crisp text on all screens
-        const dpr = Math.min(window.devicePixelRatio || 1, 2.25);
-        const baseViewport = page.getViewport({ scale: 1.0 });
-        const measuredWidth =
-          containerWidth ||
-          (wrapperRef.current?.clientWidth ? wrapperRef.current.clientWidth : 820);
-        const availableWidth = Math.max(220, measuredWidth - 8);
-
-        const effectiveScale = fitWidth
-          ? Math.min(1.6, Math.max(0.25, availableWidth / baseViewport.width)) * scale
-          : scale * 1.25;
-
-        const displayViewport = page.getViewport({ scale: effectiveScale });
-        const renderViewport = page.getViewport({ scale: effectiveScale * dpr });
-
-        setPageDimensions({
-          width: Math.floor(displayViewport.width),
-          height: Math.floor(displayViewport.height),
-        });
+        const baseViewport = page.getViewport({ scale: 1 });
+        const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 1.65);
+        const cssScale = effectiveWidth / (baseViewport.width || 600);
+        const cssViewport = page.getViewport({ scale: cssScale });
+        const renderViewport = page.getViewport({ scale: cssScale * dpr });
 
         const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false });
         canvas.width = Math.floor(renderViewport.width);
         canvas.height = Math.floor(renderViewport.height);
+        canvas.style.width = `${Math.floor(cssViewport.width)}px`;
+        canvas.style.height = `${Math.floor(cssViewport.height)}px`;
 
         renderTask = page.render({
-          canvasContext: context,
+          canvasContext: ctx,
           viewport: renderViewport,
         });
         await renderTask.promise;
-        if (!isCancelled) {
-          setRendering(false);
+        if (active) {
+          setRendered(true);
+          try {
+            const snap = canvas.toDataURL('image/jpeg', 0.85);
+            if (snap && snap.startsWith('data:image/')) {
+              PDF_PAGE_SNAPSHOT_CACHE.set(snapshotKey, snap);
+            }
+          } catch {
+            // ignore
+          }
         }
       } catch (err) {
-        if (!isCancelled && err?.name !== 'RenderingCancelledException') {
-          console.error(`Error rendering PDF page ${pageNumber}:`, err);
-          setRendering(false);
+        if (err?.name !== 'RenderingCancelledException') {
+          console.warn(`PDF page ${pageNumber} render warning:`, err);
         }
       }
     };
@@ -142,22 +216,25 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
     renderPage();
 
     return () => {
-      isCancelled = true;
+      active = false;
       if (renderTask && typeof renderTask.cancel === 'function') {
-        renderTask.cancel();
+        try {
+          renderTask.cancel();
+        } catch {
+          // ignore
+        }
       }
     };
-  }, [pdfDoc, pageNumber, scale, fitWidth, containerWidth]);
+  }, [pdfDoc, pageNumber, effectiveWidth, snapshotKey]);
 
   return (
     <div
-      ref={wrapperRef}
       style={{
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        marginBottom: totalPages > 1 ? '1.5rem' : '0.5rem',
+        marginBottom: totalPages > 1 ? '1.35rem' : '0.4rem',
         flexShrink: 0,
       }}
     >
@@ -167,11 +244,189 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            marginBottom: '0.5rem',
+            marginBottom: '0.45rem',
             padding: '3px 12px',
             borderRadius: '999px',
-            background: 'rgba(30, 41, 59, 0.85)',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
+            background: 'rgba(30, 41, 59, 0.88)',
+            border: '1px solid rgba(148, 163, 184, 0.22)',
+            color: '#94a3b8',
+            fontSize: '0.74rem',
+            fontWeight: 600,
+          }}
+        >
+          <span>
+            Page {pageNumber} of {totalPages}
+          </span>
+        </div>
+      )}
+      <div
+        style={{
+          borderRadius: '8px',
+          overflow: 'hidden',
+          boxShadow: '0 14px 36px rgba(0, 0, 0, 0.5)',
+          border: '1px solid rgba(148, 163, 184, 0.3)',
+          background: '#ffffff',
+          margin: '0 auto',
+          minHeight: rendered ? 'auto' : '360px',
+        }}
+      >
+        <canvas ref={canvasRef} style={{ display: 'block', background: '#ffffff' }} />
+      </div>
+    </div>
+  );
+};
+
+const DirectPdfJsFallback = ({ pdfBytes, cacheKey, effectiveWidth, onLoaded, onError }) => {
+  const [pdfDoc, setPdfDoc] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    let loadingTask = null;
+
+    if (!pdfBytes) return undefined;
+
+    try {
+      loadingTask = pdfjs.getDocument({ data: pdfBytes.slice(0), verbosity: 0 });
+      loadingTask.promise
+        .then((doc) => {
+          if (active) {
+            setPdfDoc(doc);
+            if (typeof onLoaded === 'function') {
+              onLoaded(doc.numPages || 1);
+            }
+          } else {
+            doc.destroy();
+          }
+        })
+        .catch((err) => {
+          if (active && typeof onError === 'function') {
+            onError(err);
+          }
+        });
+    } catch (err) {
+      if (active && typeof onError === 'function') {
+        onError(err);
+      }
+    }
+
+    return () => {
+      active = false;
+      if (loadingTask && typeof loadingTask.destroy === 'function') {
+        loadingTask.destroy().catch(() => {});
+      }
+    };
+  }, [pdfBytes, onLoaded, onError]);
+
+  if (!pdfDoc) return null;
+
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {Array.from({ length: pdfDoc.numPages || 1 }, (_, idx) => (
+        <DirectPdfJsCanvasPage
+          key={`${cacheKey}_direct_${idx + 1}`}
+          pdfDoc={pdfDoc}
+          pageNumber={idx + 1}
+          totalPages={pdfDoc.numPages || 1}
+          effectiveWidth={effectiveWidth}
+          cacheKey={cacheKey}
+        />
+      ))}
+    </div>
+  );
+};
+
+const ReactPdfPageWrapper = ({
+  cacheKey,
+  pageNumber,
+  totalPages,
+  targetWidth,
+  scale,
+  previewImage,
+}) => {
+  const snapshotKey = `${cacheKey}::page_${pageNumber}`;
+  const [cachedSnapshot, setCachedSnapshot] = useState(
+    () => PDF_PAGE_SNAPSHOT_CACHE.get(snapshotKey) || (pageNumber === 1 ? previewImage : null) || null
+  );
+  const [isRendered, setIsRendered] = useState(false);
+  const pageContainerRef = useRef(null);
+
+  const handleRenderSuccess = useCallback(() => {
+    setIsRendered(true);
+    try {
+      const canvasEl = pageContainerRef.current?.querySelector('canvas');
+      if (canvasEl && canvasEl.width > 0) {
+        const snap = canvasEl.toDataURL('image/jpeg', 0.88);
+        if (snap && snap.startsWith('data:image/')) {
+          PDF_PAGE_SNAPSHOT_CACHE.set(snapshotKey, snap);
+          setCachedSnapshot(snap);
+        }
+      }
+    } catch {
+      // ignore canvas tainting on cross-origin URLs
+    }
+  }, [snapshotKey]);
+
+  const effectiveWidth = Math.max(240, Math.round(targetWidth * scale));
+  const dpr = useMemo(
+    () => Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 1.6),
+    []
+  );
+
+  const pageLoadingFallback = useMemo(
+    () =>
+      cachedSnapshot ? (
+        <img
+          src={cachedSnapshot}
+          alt={`Page ${pageNumber} preview`}
+          style={{
+            width: `${effectiveWidth}px`,
+            maxWidth: scale <= 1.05 ? '100%' : 'none',
+            height: 'auto',
+            display: 'block',
+            background: '#ffffff',
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: `${effectiveWidth}px`,
+            minHeight: '420px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#0f172a',
+            color: '#94a3b8',
+            fontSize: '0.84rem',
+          }}
+        >
+          Loading page {pageNumber}...
+        </div>
+      ),
+    [cachedSnapshot, effectiveWidth, pageNumber, scale]
+  );
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        marginBottom: totalPages > 1 ? '1.35rem' : '0.4rem',
+        flexShrink: 0,
+      }}
+    >
+      {totalPages > 1 && (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginBottom: '0.45rem',
+            padding: '3px 12px',
+            borderRadius: '999px',
+            background: 'rgba(30, 41, 59, 0.88)',
+            border: '1px solid rgba(148, 163, 184, 0.22)',
             color: '#94a3b8',
             fontSize: '0.74rem',
             fontWeight: 600,
@@ -184,6 +439,7 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
       )}
 
       <div
+        ref={pageContainerRef}
         style={{
           position: 'relative',
           width: '100%',
@@ -193,39 +449,61 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
           paddingBottom: '4px',
         }}
       >
-        <canvas
-          ref={canvasRef}
+        <div
           style={{
-            background: '#ffffff',
+            position: 'relative',
+            display: 'block',
             borderRadius: '8px',
+            overflow: 'hidden',
             boxShadow: '0 14px 36px rgba(0, 0, 0, 0.5)',
             border: '1px solid rgba(148, 163, 184, 0.3)',
-            width: scale <= 1.05 ? `${pageDimensions.width}px` : `${pageDimensions.width}px`,
-            maxWidth: scale <= 1.05 ? '100%' : 'none',
-            height: 'auto',
-            aspectRatio: `${pageDimensions.width} / ${pageDimensions.height}`,
-            display: 'block',
+            background: '#ffffff',
             margin: '0 auto',
           }}
-        />
-        {rendering && (
+        >
+          {/* Overlay snapshot while canvas paints in background so layout is never display:none */}
+          {!isRendered && cachedSnapshot && (
+            <img
+              src={cachedSnapshot}
+              alt={`Page ${pageNumber} preview`}
+              style={{
+                width: `${effectiveWidth}px`,
+                maxWidth: scale <= 1.05 ? '100%' : 'none',
+                height: 'auto',
+                display: 'block',
+                background: '#ffffff',
+              }}
+            />
+          )}
+
           <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(15, 23, 42, 0.4)',
-              borderRadius: '8px',
-              color: '#e2e8f0',
-              fontSize: '0.84rem',
-              fontWeight: 600,
-            }}
+            style={
+              !isRendered && cachedSnapshot
+                ? {
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    opacity: 0,
+                    pointerEvents: 'none',
+                  }
+                : {
+                    position: 'relative',
+                    opacity: 1,
+                  }
+            }
           >
-            Rendering page {pageNumber}...
+            <Page
+              suspense={false}
+              pageNumber={pageNumber}
+              width={effectiveWidth}
+              devicePixelRatio={dpr}
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              onRenderSuccess={handleRenderSuccess}
+              loading={pageLoadingFallback}
+            />
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -234,102 +512,199 @@ const PdfPageCanvas = ({ pdfDoc, pageNumber, totalPages, scale, fitWidth }) => {
 export const PdfCanvasViewer = ({
   src,
   url,
+  previewImage = null,
   title = 'Document Preview',
   compact = false,
   initialScale = 1.0,
   onError,
 }) => {
   const pdfSource = src || url;
-  const [pdfDoc, setPdfDoc] = useState(null);
+  const cacheKey = useMemo(() => {
+    if (!pdfSource || typeof pdfSource !== 'string') return 'empty';
+    return pdfSource.startsWith('data:')
+      ? `data:${pdfSource.length}:${pdfSource.slice(0, 64)}`
+      : pdfSource.trim();
+  }, [pdfSource]);
+
+  const [pdfBytes, setPdfBytes] = useState(() => PDF_BINARY_CACHE.get(cacheKey) || null);
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(compact ? 0.95 : initialScale);
   const [fitWidth, setFitWidth] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !PDF_BINARY_CACHE.has(cacheKey));
   const [errorMsg, setErrorMsg] = useState(null);
+  const [useDirectFallback, setUseDirectFallback] = useState(false);
 
+  const viewportRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return Math.min(820, Math.max(300, window.innerWidth - 56));
+    }
+    return 780;
+  });
+
+  // Measure container width with debounce to prevent ResizeObserver re-render thrashing
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return undefined;
+
+    let timer = null;
+    const measure = () => {
+      const w = el.clientWidth;
+      if (w && w > 180) {
+        const target = Math.min(860, w - 28);
+        setContainerWidth((prev) => (Math.abs(prev - target) > 16 ? target : prev));
+      }
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(measure, 120);
+      });
+      observer.observe(el);
+      return () => {
+        if (timer) clearTimeout(timer);
+        observer.disconnect();
+      };
+    }
+
+    const onResize = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(measure, 120);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
+  // Load or retrieve cached PDF binary asynchronously
   useEffect(() => {
     let isCancelled = false;
-    let loadedDocument = null;
+    if (!pdfSource) return undefined;
 
-    const loadPdf = async () => {
-      if (!pdfSource) return;
-      setLoading(true);
+    setNumPages(0);
+    const existing = PDF_BINARY_CACHE.get(cacheKey);
+    if (existing) {
+      setPdfBytes(existing);
+      setLoading(false);
       setErrorMsg(null);
-      setPdfDoc(null);
-      setNumPages(0);
+      return undefined;
+    }
 
-      try {
-        let docData;
-        if (typeof pdfSource === 'string' && pdfSource.startsWith('data:')) {
-          docData = base64ToUint8Array(pdfSource);
-        } else {
-          const resolvedUrl =
-            typeof pdfSource === 'string' && !pdfSource.startsWith('blob:')
-              ? encodeURI(pdfSource)
-              : pdfSource;
-          const res = await fetch(resolvedUrl);
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status} while loading PDF`);
-          }
-          const buf = await res.arrayBuffer();
-          docData = new Uint8Array(buf);
-        }
+    setLoading(true);
+    setErrorMsg(null);
 
-        // Verify valid %PDF- magic bytes within first 1024 bytes before invoking pdfjs worker
-        const headerWindow = Math.min(docData.length, 1024);
-        let pdfHeaderOffset = -1;
-        for (let i = 0; i <= headerWindow - 5; i++) {
-          if (
-            docData[i] === 0x25 && // %
-            docData[i + 1] === 0x50 && // P
-            docData[i + 2] === 0x44 && // D
-            docData[i + 3] === 0x46 && // F
-            docData[i + 4] === 0x2d // -
-          ) {
-            pdfHeaderOffset = i;
-            break;
-          }
-        }
-
-        if (pdfHeaderOffset === -1) {
-          throw new Error('The selected document is not a valid PDF file.');
-        }
-
-        if (pdfHeaderOffset > 0) {
-          docData = docData.slice(pdfHeaderOffset);
-        }
-
-        const loadingTask = pdfjsLib.getDocument({
-          data: docData,
-          verbosity: 0,
-        });
-        loadedDocument = await loadingTask.promise;
-
-        if (!isCancelled) {
-          setPdfDoc(loadedDocument);
-          setNumPages(loadedDocument.numPages || 1);
+    preloadPdfDocument(pdfSource)
+      .then((bytes) => {
+        if (!isCancelled && bytes) {
+          setPdfBytes(bytes);
           setLoading(false);
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!isCancelled) {
-          setErrorMsg(err?.message || 'Unable to render PDF document.');
+          setErrorMsg(err?.message || 'Unable to load PDF document.');
           setLoading(false);
           if (typeof onError === 'function') {
             onError(err);
           }
         }
-      }
-    };
-
-    loadPdf();
+      });
 
     return () => {
       isCancelled = true;
-      if (loadedDocument && typeof loadedDocument.destroy === 'function') {
-        loadedDocument.destroy();
-      }
     };
-  }, [pdfSource, onError]);
+  }, [pdfSource, cacheKey, onError]);
+
+  // Provide a fresh copy of the Uint8Array to react-pdf so worker transfer never detaches our cached buffer
+  const documentFile = useMemo(() => {
+    if (!pdfBytes) return null;
+    return { data: pdfBytes.slice(0) };
+  }, [pdfBytes]);
+
+  const documentOptions = useMemo(
+    () => ({
+      verbosity: 0,
+    }),
+    []
+  );
+
+  const handleDocumentLoadSuccess = useCallback((pdf) => {
+    setNumPages(pdf?.numPages || 1);
+    setLoading(false);
+  }, []);
+
+  const handleDocumentLoadError = useCallback(() => {
+    // Switch seamlessly to direct PDF.js canvas fallback if react-pdf Document fails
+    setUseDirectFallback(true);
+    setLoading(false);
+  }, []);
+
+  const handleDirectLoaded = useCallback((loadedCount) => {
+    setNumPages(loadedCount || 1);
+    setLoading(false);
+  }, []);
+
+  const handleDirectError = useCallback(
+    (err) => {
+      setErrorMsg(err?.message || 'Unable to render PDF document.');
+      setLoading(false);
+      if (typeof onError === 'function') {
+        onError(err);
+      }
+    },
+    [onError]
+  );
+
+  const fallbackSnapshot =
+    PDF_PAGE_SNAPSHOT_CACHE.get(`${cacheKey}::page_1`) || previewImage || null;
+
+  const baseTargetWidth = fitWidth ? containerWidth : 780;
+  const effectiveWidth = Math.max(240, Math.round(baseTargetWidth * scale));
+
+  const documentLoadingNode = useMemo(
+    () =>
+      fallbackSnapshot ? (
+        <img
+          src={fallbackSnapshot}
+          alt={title}
+          style={{
+            width: `${effectiveWidth}px`,
+            maxWidth: '100%',
+            height: 'auto',
+            borderRadius: '8px',
+            background: '#ffffff',
+            boxShadow: '0 14px 36px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(148, 163, 184, 0.3)',
+            display: 'block',
+            margin: '0 auto',
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            margin: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '2.5rem',
+            color: '#94a3b8',
+          }}
+        >
+          <i
+            className="fas fa-circle-notch fa-spin"
+            style={{ fontSize: '1.8rem', color: '#38bdf8' }}
+          ></i>
+          <span style={{ fontSize: '0.88rem' }}>Rendering PDF pages...</span>
+        </div>
+      ),
+    [fallbackSnapshot, title, effectiveWidth]
+  );
 
   return (
     <div
@@ -482,38 +857,23 @@ export const PdfCanvasViewer = ({
         </div>
       </div>
 
-      {/* Scrollable Canvas Pages Viewport (Top-aligned so Page 1 is never clipped) */}
+      {/* Scrollable React-PDF Viewport */}
       <div
+        ref={viewportRef}
         style={{
           flex: 1,
           overflowY: 'auto',
           overflowX: 'auto',
-          padding: compact ? '0.6rem' : 'clamp(0.65rem, 2.5vw, 1.25rem) clamp(0.45rem, 2vw, 1rem) 1.5rem',
+          padding: compact
+            ? '0.6rem'
+            : 'clamp(0.65rem, 2.5vw, 1.25rem) clamp(0.45rem, 2vw, 1rem) 1.5rem',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'flex-start',
         }}
       >
-        {loading && (
-          <div
-            style={{
-              margin: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '2.5rem',
-              color: '#94a3b8',
-            }}
-          >
-            <i
-              className="fas fa-circle-notch fa-spin"
-              style={{ fontSize: '1.8rem', color: '#38bdf8' }}
-            ></i>
-            <span style={{ fontSize: '0.88rem' }}>Rendering PDF pages...</span>
-          </div>
-        )}
+        {loading && !documentFile && documentLoadingNode}
 
         {errorMsg && !loading && (
           <div
@@ -533,19 +893,54 @@ export const PdfCanvasViewer = ({
           </div>
         )}
 
-        {!loading &&
-          !errorMsg &&
-          pdfDoc &&
-          Array.from({ length: numPages }, (_, idx) => (
-            <PdfPageCanvas
-              key={idx + 1}
-              pdfDoc={pdfDoc}
-              pageNumber={idx + 1}
-              totalPages={numPages}
-              scale={scale}
-              fitWidth={fitWidth}
-            />
-          ))}
+        {!errorMsg && documentFile && (
+          <PdfErrorBoundary
+            key={cacheKey}
+            onBoundaryError={() => setUseDirectFallback(true)}
+            fallback={
+              <DirectPdfJsFallback
+                pdfBytes={pdfBytes}
+                cacheKey={cacheKey}
+                effectiveWidth={effectiveWidth}
+                onLoaded={handleDirectLoaded}
+                onError={handleDirectError}
+              />
+            }
+          >
+            {useDirectFallback ? (
+              <DirectPdfJsFallback
+                pdfBytes={pdfBytes}
+                cacheKey={cacheKey}
+                effectiveWidth={effectiveWidth}
+                onLoaded={handleDirectLoaded}
+                onError={handleDirectError}
+              />
+            ) : (
+              <Document
+                suspense={false}
+                file={documentFile}
+                options={documentOptions}
+                onLoadSuccess={handleDocumentLoadSuccess}
+                onLoadError={handleDocumentLoadError}
+                loading={documentLoadingNode}
+              >
+                {numPages > 0
+                  ? Array.from({ length: numPages }, (_, idx) => (
+                      <ReactPdfPageWrapper
+                        key={`${cacheKey}_page_${idx + 1}`}
+                        cacheKey={cacheKey}
+                        pageNumber={idx + 1}
+                        totalPages={numPages}
+                        targetWidth={baseTargetWidth}
+                        scale={scale}
+                        previewImage={idx === 0 ? previewImage : null}
+                      />
+                    ))
+                  : documentLoadingNode}
+              </Document>
+            )}
+          </PdfErrorBoundary>
+        )}
       </div>
     </div>
   );

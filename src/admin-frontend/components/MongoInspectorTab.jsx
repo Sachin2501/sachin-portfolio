@@ -102,7 +102,7 @@ export const MongoInspectorTab = ({
   const totalSkills =
     (skillCategories || []).reduce((sum, cat) => sum + (cat.skills?.length || 0), 0) ||
     skillsCount ||
-    29;
+    31;
 
   const fallbackTotalDocuments =
     projectsCount +
@@ -371,7 +371,7 @@ export const MongoInspectorTab = ({
   const formattedUptime = formatUptimeDuration(effectiveUptimeSeconds);
 
   const liveDbInfo = activePing.database || dbInfo;
-  const totalDocuments = activePing.totalRecords ?? fallbackTotalDocuments;
+  const totalDocuments = fallbackTotalDocuments || activePing.totalRecords;
 
   const latencyTier =
     activePing.state === 'offline'
@@ -415,37 +415,37 @@ export const MongoInspectorTab = ({
     {
       name: 'projects',
       endpoint: '/api/projects',
-      count: activePing.counts?.projects ?? projectsCount,
+      count: projectsCount || activePing.counts?.projects || 0,
       desc: 'Software engineering, Full Stack & AI/ML portfolio projects',
     },
     {
       name: 'experience',
       endpoint: '/api/experience',
-      count: activePing.counts?.experience ?? experienceCount,
+      count: experienceCount || activePing.counts?.experience || 0,
       desc: 'Professional internships, domain roles & completion certificates',
     },
     {
       name: 'skills',
       endpoint: '/api/skills',
-      count: activePing.counts?.skills ?? totalSkills,
+      count: totalSkills || activePing.counts?.skills || 0,
       desc: 'Domain-categorized technical skills across 5 engineering categories',
     },
     {
       name: 'certifications',
       endpoint: '/api/certifications',
-      count: activePing.counts?.certifications ?? certificationsCount,
+      count: certificationsCount || activePing.counts?.certifications || 0,
       desc: 'Verified credentials, ISRO, AI/ML & Web Development certificates',
     },
     {
       name: 'education',
       endpoint: '/api/education',
-      count: activePing.counts?.education ?? educationCount,
+      count: educationCount || activePing.counts?.education || 0,
       desc: 'Academic degrees, institutions, coursework & CGPA records',
     },
     {
       name: 'messages',
       endpoint: '/api/contact/messages',
-      count: activePing.counts?.messages ?? messagesCount,
+      count: messagesCount || activePing.counts?.messages || 0,
       desc: 'Visitor contact inquiries & direct email messages',
     },
   ];
@@ -617,12 +617,12 @@ export const MongoInspectorTab = ({
     mode: liveDbInfo?.isLiveAtlas ? 'MongoDB Atlas Cloud' : 'Active Persistent NoSQL Store',
     totalDocuments,
     collections: {
-      projects: activePing.counts?.projects ?? projectsCount,
-      experience: activePing.counts?.experience ?? experienceCount,
-      skills: activePing.counts?.skills ?? totalSkills,
-      certifications: activePing.counts?.certifications ?? certificationsCount,
-      education: activePing.counts?.education ?? educationCount,
-      messages: activePing.counts?.messages ?? messagesCount,
+      projects: projectsCount || activePing.counts?.projects || 0,
+      experience: experienceCount || activePing.counts?.experience || 0,
+      skills: totalSkills || activePing.counts?.skills || 0,
+      certifications: certificationsCount || activePing.counts?.certifications || 0,
+      education: educationCount || activePing.counts?.education || 0,
+      messages: messagesCount || activePing.counts?.messages || 0,
     },
   };
 

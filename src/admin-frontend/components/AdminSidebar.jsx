@@ -31,7 +31,7 @@ export const AdminSidebar = ({
     { id: 'seo-generator', label: 'SEO & Social Meta', shortLabel: 'SEO', icon: Globe },
     { id: 'certifications', label: `Certifications (${counts.certifications})`, shortLabel: `Certs (${counts.certifications})`, icon: Award },
     { id: 'education', label: `Education (${counts.education})`, shortLabel: `Edu (${counts.education})`, icon: GraduationCap },
-    { id: 'skills', label: `Skills (${counts.skills} added)`, shortLabel: `Skills (${counts.skills})`, icon: Cpu },
+    { id: 'skills', label: `Skills (${counts.skills})`, shortLabel: `Skills (${counts.skills})`, icon: Cpu },
     { id: 'photos', label: 'Photos & Profile', shortLabel: 'Photos', icon: Image },
     { id: 'messages', label: `Inquiries (${counts.messages})`, shortLabel: `Inbox (${counts.messages})`, icon: Inbox },
     { id: 'mongodb', label: 'MongoDB & API Monitor', shortLabel: 'MongoDB', icon: Database },

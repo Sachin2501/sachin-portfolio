@@ -1,11 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Award } from 'lucide-react';
 import { SectionTechBackground } from './SectionTechBackground.jsx';
+import { preloadPdfDocument } from './PdfCanvasViewer.jsx';
+import { preloadCertificateImage } from './CertificateModal.jsx';
 import { usePortfolioBackend } from '../../context/PortfolioBackendContext.jsx';
 
 export const Certifications = ({ onSelectCertificate }) => {
   const { certificationsList } = usePortfolioBackend();
   const [selectedFilter, setSelectedFilter] = useState('all');
+
+  const warmCertAssets = useCallback((cert, includePdf = false) => {
+    if (!cert) return;
+    const imgUrl = cert.preview || cert.image || cert.file;
+    if (imgUrl && !String(imgUrl).toLowerCase().includes('.pdf')) {
+      preloadCertificateImage(imgUrl).catch(() => {});
+    } else if (
+      cert.file &&
+      String(cert.file).startsWith('/certificates/') &&
+      String(cert.file).toLowerCase().endsWith('.pdf')
+    ) {
+      const base = String(cert.file).replace(/^\/certificates\//, '').replace(/\.pdf$/i, '');
+      if (base) {
+        preloadCertificateImage(`/certificates/previews/${base}.png`).catch(() => {});
+      }
+    }
+    if (includePdf && cert.file && String(cert.file).toLowerCase().includes('.pdf')) {
+      preloadPdfDocument(cert.file).catch(() => {});
+    }
+  }, []);
+
+  // Preload all certificate preview images in the background so opening any certificate is instant (0ms)
+  useEffect(() => {
+    if (!Array.isArray(certificationsList) || certificationsList.length === 0) return undefined;
+    const timers = certificationsList.map((cert, idx) =>
+      setTimeout(() => {
+        warmCertAssets(cert, false);
+      }, idx * 45)
+    );
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, [certificationsList, warmCertAssets]);
 
   const knownKeys = ['web', 'ai', 'isro', 'internship', 'other'];
 
@@ -88,6 +123,9 @@ export const Certifications = ({ onSelectCertificate }) => {
                       <button
                         type="button"
                         className="certificate-view"
+                        onMouseEnter={() => warmCertAssets(cert, true)}
+                        onFocus={() => warmCertAssets(cert, true)}
+                        onTouchStart={() => warmCertAssets(cert, true)}
                         onClick={() => onSelectCertificate(cert)}
                         title={`View ${cert.title}`}
                       >

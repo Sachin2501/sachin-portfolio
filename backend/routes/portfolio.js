@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import {
   ProjectModel,
   CertificationModel,
@@ -6,8 +9,10 @@ import {
   ExperienceModel,
   SkillModel,
   ProfileModel,
+  MessageModel,
+  AuditLogModel,
 } from '../models/index.js';
-import { db } from '../db/database.js';
+import { db, realtimeBus } from '../db/database.js';
 import { authenticateAdmin } from '../middleware/auth.js';
 import {
   validateProject,
@@ -18,11 +23,108 @@ import {
 } from '../models/validators.js';
 import { recordAuditLog } from '../services/auditLogger.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PUBLIC_CERT_PREVIEWS_DIR = path.resolve(__dirname, '../../public/certificates/previews');
+
 export const portfolioRouter = Router();
+
+// ==========================================
+// 0A. REAL-TIME SERVER-SENT EVENTS STREAM (GET /api/realtime/stream)
+// ==========================================
+portfolioRouter.get('/realtime/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (typeof res.flushHeaders === 'function') {
+    res.flushHeaders();
+  }
+
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: new Date().toISOString() })}\n\n`);
+
+  const onDbChange = (event) => {
+    try {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    } catch {
+      // ignore closed socket write errors
+    }
+  };
+
+  realtimeBus.on('change', onDbChange);
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: heartbeat ${Date.now()}\n\n`);
+    } catch {
+      clearInterval(heartbeat);
+    }
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    realtimeBus.off('change', onDbChange);
+  });
+});
+
+// ==========================================
+// 0B. BINARY PROFILE MEDIA STREAMING (GET /api/profile/media/:field)
+// ==========================================
+portfolioRouter.get('/profile/media/:field', async (req, res) => {
+  try {
+    const field = String(req.params.field || '').trim();
+    const allowedFields = new Set(['heroImage', 'aboutImage', 'logoImage', 'resumeUrl']);
+    if (!allowedFields.has(field)) {
+      return res.status(400).json({ success: false, error: 'Unsupported media field' });
+    }
+
+    const profile = await ProfileModel.get();
+    const rawVal = String(profile?.[field] || '').trim();
+    if (!rawVal) {
+      return res.status(404).json({ success: false, error: 'Media field is empty' });
+    }
+
+    const match = rawVal.match(/^data:([^;]+);base64,(.+)$/s);
+    if (match) {
+      const mimeType = match[1] || 'application/octet-stream';
+      const buf = Buffer.from(match[2], 'base64');
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', buf.length);
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      return res.send(buf);
+    }
+
+    if (rawVal.includes('/api/profile/media/')) {
+      return res.redirect(302, field === 'heroImage' ? '/images/profile-hero.jpg' : '/certificates/resume.pdf');
+    }
+
+    if (rawVal.startsWith('/') || rawVal.startsWith('http://') || rawVal.startsWith('https://')) {
+      return res.redirect(302, rawVal);
+    }
+
+    return res.status(404).json({ success: false, error: 'Media not found' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // ==========================================
 // 0. AGGREGATED PORTFOLIO PAYLOAD (GET /api/portfolio)
 // ==========================================
+
+function optimizeProfileForWire(profile, isLight = false) {
+  if (!profile || typeof profile !== 'object') return {};
+  const clone = { ...profile };
+  const versionTag = encodeURIComponent(String(clone.updatedAt || clone.createdAt || 'v1'));
+  // Only offload multi-MB PDF resumeUrl in light mode; always send heroImage, aboutImage, logoImage directly so Admin & Frontend update in 0ms
+  if (isLight) {
+    const val = clone.resumeUrl;
+    if (typeof val === 'string' && val.startsWith('data:') && val.length > 500000) {
+      clone.resumeUrl = `/api/profile/media/resumeUrl?v=${versionTag}`;
+    }
+  }
+  return clone;
+}
 
 function optimizeCertForWire(c) {
   if (!c || typeof c !== 'object') return c;
@@ -39,12 +141,88 @@ function optimizeCertForWire(c) {
       clone.link = `/api/certifications/${certId}/file.pdf`;
     }
   }
+
+  const rawFile = String(clone.file || clone.link || '').trim().split('?')[0];
+  if (
+    !clone.preview &&
+    !clone.image &&
+    rawFile.startsWith('/certificates/') &&
+    rawFile.toLowerCase().endsWith('.pdf')
+  ) {
+    const fileName = rawFile.replace(/^\/certificates\//, '').replace(/\.pdf$/i, '');
+    if (fileName && fs.existsSync(path.join(PUBLIC_CERT_PREVIEWS_DIR, `${fileName}.png`))) {
+      const derivedPreview = `/certificates/previews/${fileName}.png`;
+      clone.preview = derivedPreview;
+      clone.image = derivedPreview;
+    }
+  }
   return clone;
 }
 
-portfolioRouter.get('/portfolio', async (_req, res) => {
+function buildAuditStatsSummary(logs = []) {
+  const stats = {
+    total: logs.length,
+    byCollection: {
+      projects: 0,
+      experience: 0,
+      certifications: 0,
+      education: 0,
+      skills: 0,
+      profile: 0,
+      messages: 0,
+      other: 0,
+    },
+    byAction: {
+      CREATE: 0,
+      UPDATE: 0,
+      DELETE: 0,
+    },
+    recent24h: 0,
+    admins: {},
+    lastActivity: null,
+  };
+
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  for (const log of logs) {
+    const col = String(log.collectionName || 'other').toLowerCase();
+    if (stats.byCollection[col] !== undefined) {
+      stats.byCollection[col]++;
+    } else {
+      stats.byCollection.other++;
+    }
+
+    const act = String(log.action || '').toUpperCase();
+    if (stats.byAction[act] !== undefined) {
+      stats.byAction[act]++;
+    }
+
+    const logTime = new Date(log.timestamp || log.createdAt || 0).getTime();
+    if (logTime >= oneDayAgo) {
+      stats.recent24h++;
+    }
+    if (!stats.lastActivity || logTime > new Date(stats.lastActivity).getTime()) {
+      stats.lastActivity = log.timestamp || log.createdAt || null;
+    }
+
+    const adminName = log.changedBy?.username || 'admin';
+    stats.admins[adminName] = (stats.admins[adminName] || 0) + 1;
+  }
+  return stats;
+}
+
+portfolioRouter.get('/portfolio', async (req, res) => {
   try {
-    let [projects, certifications, education, experience, skills, profile, messagesCount, dbHealth] =
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
+    const isLight = req.query.light === '1' || req.query.light === 'true';
+    const forceSync = req.query.sync === '1' || req.query.force === '1';
+    if (forceSync) {
+      await db.pullAllFromAtlas(true);
+    }
+
+    let [projects, certifications, education, experience, skills, profile, rawMessages, rawAuditLogs, dbHealth] =
       await Promise.all([
         ProjectModel.find(),
         CertificationModel.find(),
@@ -52,12 +230,29 @@ portfolioRouter.get('/portfolio', async (_req, res) => {
         ExperienceModel.find(),
         SkillModel.find(),
         ProfileModel.get(),
-        db.messages.countDocuments(),
+        MessageModel.find({}),
+        AuditLogModel.find(),
         db.getHealth(),
       ]);
 
     const cleanExperience = (experience || []).filter((e) => e.role !== 'Senior Full Stack Engineer');
     const wireCertifications = (certifications || []).map(optimizeCertForWire);
+    const wireProfile = optimizeProfileForWire(profile, isLight);
+    const sortedMessages = Array.isArray(rawMessages)
+      ? [...rawMessages].sort((a, b) => {
+          const tA = new Date(a.timestamp || a.createdAt || 0).getTime() || 0;
+          const tB = new Date(b.timestamp || b.createdAt || 0).getTime() || 0;
+          return tB - tA;
+        })
+      : [];
+    const sortedAuditLogs = Array.isArray(rawAuditLogs)
+      ? [...rawAuditLogs].sort(
+          (a, b) =>
+            (new Date(b.timestamp || b.createdAt || 0).getTime() || 0) -
+            (new Date(a.timestamp || a.createdAt || 0).getTime() || 0)
+        )
+      : [];
+    const auditStats = buildAuditStatsSummary(sortedAuditLogs);
 
     res.json({
       success: true,
@@ -72,15 +267,18 @@ portfolioRouter.get('/portfolio', async (_req, res) => {
         education: (education || []).length,
         experience: cleanExperience.length,
         skills: (skills || []).length,
-        messages: messagesCount || 0,
+        messages: sortedMessages.length,
       },
       data: {
-        profile: profile || {},
+        profile: wireProfile,
         projects: projects || [],
         experience: cleanExperience,
         skills: skills || [],
         certifications: wireCertifications,
         education: education || [],
+        messages: sortedMessages,
+        auditLogs: sortedAuditLogs.slice(0, 150),
+        auditStats,
       },
       timestamp: new Date().toISOString(),
     });
@@ -151,18 +349,7 @@ portfolioRouter.post('/projects', authenticateAdmin, async (req, res) => {
 portfolioRouter.put('/projects/:id', authenticateAdmin, async (req, res) => {
   try {
     const rawId = decodeURIComponent(req.params.id || '').trim();
-    let existing = await ProjectModel.findById(rawId);
-
-    // Fallback: match by title if ID format changed between seed and Atlas
-    if (!existing && req.body?.title) {
-      const allProjects = await ProjectModel.find();
-      existing =
-        allProjects.find(
-          (p) =>
-            String(p.title || '').toLowerCase() ===
-            String(req.body.title || '').toLowerCase()
-        ) || null;
-    }
+    const existing = await ProjectModel.findById(rawId);
 
     const mergedCandidate = {
       title: existing?.title || req.body?.title || 'Portfolio Project',
@@ -403,7 +590,7 @@ portfolioRouter.get(['/certifications/:id/file.pdf', '/certifications/:id/file']
       res.setHeader('Cache-Control', 'public, max-age=3600');
       return res.send(buf);
     }
-    if (typeof rawMedia === 'string' && rawMedia.startsWith('http')) {
+    if (typeof rawMedia === 'string' && (rawMedia.startsWith('http') || rawMedia.startsWith('/'))) {
       return res.redirect(rawMedia);
     }
     return res.status(404).send('Certificate file not available');
@@ -438,10 +625,11 @@ portfolioRouter.post('/certifications', authenticateAdmin, async (req, res) => {
       after: newCert,
     });
 
+    const wireNewCert = optimizeCertForWire(newCert);
     res.status(201).json({
       success: true,
       message: `Certification "${newCert.title}" saved to MongoDB!`,
-      data: newCert,
+      data: wireNewCert,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -451,14 +639,7 @@ portfolioRouter.post('/certifications', authenticateAdmin, async (req, res) => {
 portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) => {
   try {
     const rawId = decodeURIComponent(req.params.id || '').trim();
-    let existing = await CertificationModel.findById(rawId);
-    if (!existing && req.body?.title) {
-      const allCerts = await CertificationModel.find();
-      existing =
-        allCerts.find(
-          (c) => String(c.title || '').toLowerCase() === String(req.body.title || '').toLowerCase()
-        ) || null;
-    }
+    const existing = await CertificationModel.findById(rawId);
 
     const mergedCandidate = {
       title: existing?.title || req.body?.title || 'Professional Certification',
@@ -501,7 +682,11 @@ portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) =
         after: updated,
         modifiedFields: Object.keys(req.body || {}),
       });
-      return res.json({ success: true, data: updated, message: 'Certification updated in MongoDB' });
+      return res.json({
+        success: true,
+        data: optimizeCertForWire(updated),
+        message: 'Certification updated in MongoDB',
+      });
     }
     return res.status(404).json({ success: false, error: 'Certification not found' });
   } catch (err) {
@@ -584,15 +769,7 @@ portfolioRouter.post('/education', authenticateAdmin, async (req, res) => {
 portfolioRouter.put('/education/:id', authenticateAdmin, async (req, res) => {
   try {
     const rawId = decodeURIComponent(req.params.id || '').trim();
-    let existing = await EducationModel.findById(rawId);
-    if (!existing && (req.body?.degree || req.body?.title)) {
-      const allEdu = await EducationModel.find();
-      const targetDeg = String(req.body.degree || req.body.title || '').toLowerCase();
-      existing =
-        allEdu.find(
-          (e) => String(e.degree || e.title || '').toLowerCase() === targetDeg
-        ) || null;
-    }
+    const existing = await EducationModel.findById(rawId);
 
     const mergedCandidate = {
       degree: existing?.degree || existing?.title || req.body?.degree || req.body?.title || 'Degree Program',
@@ -729,15 +906,7 @@ portfolioRouter.post('/experience', authenticateAdmin, async (req, res) => {
 portfolioRouter.put('/experience/:id', authenticateAdmin, async (req, res) => {
   try {
     const rawId = decodeURIComponent(req.params.id || '').trim();
-    let existing = await ExperienceModel.findById(rawId);
-    if (!existing && (req.body?.role || req.body?.title)) {
-      const allExp = await ExperienceModel.find();
-      const targetRole = String(req.body.role || req.body.title || '').toLowerCase();
-      existing =
-        allExp.find(
-          (e) => String(e.role || e.title || '').toLowerCase() === targetRole
-        ) || null;
-    }
+    const existing = await ExperienceModel.findById(rawId);
 
     const mergedCandidate = {
       role: existing?.role || existing?.title || req.body?.role || req.body?.title || 'Software Engineer',

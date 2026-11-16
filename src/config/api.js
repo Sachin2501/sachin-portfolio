@@ -1,17 +1,21 @@
-// Centralized API configuration supporting separate deployments
-// In development: defaults to relative '/api' (same origin)
-// In production (when deployed separately on Vercel/Netlify):
-// set VITE_API_BASE_URL=https://your-backend.onrender.com
+// Centralized API configuration
+// Always resolves /api/* requests against the same-origin Express / Vercel Serverless backend
+// so external sleeping Render URLs in VITE_API_BASE_URL never cause "Failed to fetch" errors.
 
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+export const API_BASE_URL = '';
 
 export const buildApiUrl = (endpoint) => {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  if (!API_BASE_URL) return cleanEndpoint;
-  return `${API_BASE_URL}${cleanEndpoint}`;
+  if (!endpoint) return '/api';
+  const raw = String(endpoint).trim();
+  const stripped = raw.replace(/^https?:\/\/[^/]*onrender\.com/i, '');
+  if (stripped.startsWith('http://') || stripped.startsWith('https://')) {
+    return stripped;
+  }
+  return stripped.startsWith('/') ? stripped : `/${stripped}`;
 };
 
 export const apiFetch = (endpoint, options = {}) => {
   const url = buildApiUrl(endpoint);
   return fetch(url, options);
 };
+

@@ -388,10 +388,22 @@ export const GitHubContributions = () => {
       setIsRateLimited(false);
 
       try {
-        const query = forceRefresh ? '?refresh=1' : '';
-        const backendRes = await fetch(buildApiUrl(`/api/github/${username}${query}`), {
-          cache: 'no-store',
-        }).catch(() => null);
+        const ts = Date.now();
+        let backendRes = null;
+        if (forceRefresh) {
+          backendRes = await fetch(buildApiUrl(`/api/github/${username}/revalidate?_t=${ts}`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username }),
+            cache: 'no-store',
+          }).catch(() => null);
+        }
+        if (!backendRes || !backendRes.ok) {
+          const query = forceRefresh ? `?refresh=1&_t=${ts}` : `?_t=${ts}`;
+          backendRes = await fetch(buildApiUrl(`/api/github/${username}${query}`), {
+            cache: 'no-store',
+          }).catch(() => null);
+        }
 
         let result = null;
         if (backendRes && backendRes.ok) {
@@ -401,34 +413,39 @@ export const GitHubContributions = () => {
           }
         }
 
-        if (!result) {
-          result = await fetchDirectFromGitHub();
+        if (!result || (!Array.isArray(result.events) || result.events.length === 0)) {
+          const directResult = await fetchDirectFromGitHub();
+          if (directResult && Array.isArray(directResult.events) && directResult.events.length > 0) {
+            result = directResult;
+          } else if (!result) {
+            result = directResult;
+          }
         }
 
-        if (result.profile) {
+        if (result?.profile) {
           setProfile(result.profile);
         }
 
-        if (Array.isArray(result.repos) && result.repos.length > 0) {
+        if (Array.isArray(result?.repos) && result.repos.length > 0) {
           const nonProfileRepos = result.repos.filter(
             (r) => r.name?.toLowerCase() !== username.toLowerCase()
           );
           setRepos((nonProfileRepos.length >= 4 ? nonProfileRepos : result.repos).slice(0, 4));
         }
 
-        if (result.contributions && Array.isArray(result.contributions.contributions)) {
+        if (result?.contributions && Array.isArray(result.contributions.contributions)) {
           setContributionCalendar(result.contributions);
         }
 
-        if (Array.isArray(result.events) && result.events.length > 0) {
+        if (Array.isArray(result?.events) && result.events.length > 0) {
           setEvents(result.events);
           setIsRateLimited(false);
         } else {
-          setIsRateLimited(Boolean(result.isRateLimited));
+          setIsRateLimited(Boolean(result?.isRateLimited));
           setEvents((prev) => (prev.length > 0 ? prev : fallbackActivities));
         }
 
-        setLastUpdated(result.syncedAt ? new Date(result.syncedAt) : new Date());
+        setLastUpdated(result?.syncedAt ? new Date(result.syncedAt) : new Date());
       } catch (err) {
         console.warn('GitHub real-time sync fallback note:', err);
         setEvents((prev) => (prev.length > 0 ? prev : fallbackActivities));
@@ -842,7 +859,7 @@ export const GitHubContributions = () => {
               </div>
             ) : (
               <div className="github-timeline">
-                {filteredEvents.slice(0, 12).map((event) => {
+                {filteredEvents.map((event) => {
                   const badge = getEventBadge(event.type, event.payload);
                   const cleanRepoName = event.repo?.name
                     ? event.repo.name.replace(new RegExp(`^${username}/`, 'i'), '')

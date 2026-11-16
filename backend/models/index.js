@@ -85,6 +85,18 @@ export const ProfileModel = {
 
     const cleanUpdates = { ...updates };
     delete cleanUpdates._id;
+    for (const mediaKey of ['heroImage', 'aboutImage', 'logoImage', 'resumeUrl']) {
+      if (
+        typeof cleanUpdates[mediaKey] === 'string' &&
+        cleanUpdates[mediaKey].includes('/api/profile/media/')
+      ) {
+        if (existing && existing[mediaKey]) {
+          cleanUpdates[mediaKey] = existing[mediaKey];
+        } else {
+          delete cleanUpdates[mediaKey];
+        }
+      }
+    }
 
     if (existing) {
       const targetId = existing.id || existing._id || 'config';

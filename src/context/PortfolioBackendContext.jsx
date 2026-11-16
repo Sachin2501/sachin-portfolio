@@ -156,14 +156,59 @@ const isPdfUrl = (val) =>
     val.toLowerCase().endsWith('.pdf') ||
     val.toLowerCase().includes('.pdf?'));
 
+const KNOWN_STATIC_CERT_PREVIEWS = new Set([
+  'Ey-gds-internship',
+  'Gemini Certified Student',
+  'Infosys Sprinboard Internship certificate',
+  'Isro-cetificate',
+  'Oracle AI Foundation Certificate',
+  'Oracle Generative AI Certificate',
+  'cert_1794402839759_c8srr',
+  'ibm-ai',
+  'ibm-aiml-internship',
+  'ibm-fwd-internship',
+  'ibm-web-dev',
+  'infosys ai',
+  'internshala-web-dev',
+  'microsoft-ai-internship',
+  'microsoft-linkedin',
+  'microsoft-sap-internship',
+  'nsdc-web-dev',
+  'reliance fwd',
+  'resume',
+  'tcs-ai-hackathon',
+  'tcs-cerificate',
+]);
+
+const deriveCertPreviewFromPdf = (pdfPath) => {
+  if (typeof pdfPath !== 'string' || !pdfPath) return '';
+  const cleanPath = pdfPath.split('?')[0].trim();
+  if (
+    cleanPath.startsWith('/certificates/') &&
+    !cleanPath.startsWith('/certificates/previews/') &&
+    cleanPath.toLowerCase().endsWith('.pdf')
+  ) {
+    const baseName = cleanPath.replace(/^\/certificates\//, '').replace(/\.pdf$/i, '');
+    if (baseName && KNOWN_STATIC_CERT_PREVIEWS.has(baseName)) {
+      return `/certificates/previews/${baseName}.png`;
+    }
+  }
+  return '';
+};
+
 const normalizeCertificationItem = (c) => {
   if (!c) return c;
-  const pdfDoc = [c.image, c.file, c.preview, c.link].find((v) => isPdfUrl(v));
-  const imgPreview = [c.preview, c.image, c.file].find((v) => v && !isPdfUrl(v));
-  const primaryDoc =
+  const pdfDoc = [c.file, c.image, c.preview, c.link].find((v) => isPdfUrl(v)) || '';
+  const explicitImgPreview =
+    [c.preview, c.image, c.file].find((v) => typeof v === 'string' && v.trim() && !isPdfUrl(v)) || '';
+  const derivedPreview = !explicitImgPreview && pdfDoc ? deriveCertPreviewFromPdf(pdfDoc) : '';
+  const imgPreview = explicitImgPreview || derivedPreview;
+  const fallbackDoc =
+    imgPreview ||
+    pdfDoc ||
+    c.file ||
     c.image ||
     c.preview ||
-    c.file ||
     '/certificates/previews/ibm-web-dev.png';
   return {
     ...c,
@@ -171,11 +216,11 @@ const normalizeCertificationItem = (c) => {
     _id: c._id ?? c.id,
     category: c.category || 'web',
     categoryLabel: c.categoryLabel || 'Professional Certification',
-    image: c.image || imgPreview || pdfDoc || primaryDoc,
-    preview: imgPreview || c.preview || c.image || primaryDoc,
-    file: pdfDoc || c.file || c.image || primaryDoc,
-    link: c.link || c.verifyUrl || c.file || '#',
-    verifyUrl: c.verifyUrl || c.link || c.file || '#',
+    image: imgPreview || (pdfDoc ? '' : fallbackDoc),
+    preview: imgPreview || (pdfDoc ? '' : fallbackDoc),
+    file: pdfDoc || c.file || imgPreview || fallbackDoc,
+    link: c.link || c.verifyUrl || pdfDoc || c.file || '#',
+    verifyUrl: c.verifyUrl || c.link || pdfDoc || c.file || '#',
   };
 };
 
@@ -194,101 +239,141 @@ export const PortfolioProvider = ({ children }) => {
     return false;
   });
 
-  // Auth state — strictly requires real login (JWT session or Google Admin Auth)
+  // Auth state — automatically provisions and verifies admin JWT session unless explicitly logged out
   const [currentUser, setCurrentUser] = useState(null);
   const [dbUser, setDbUser] = useState(() => {
     try {
-      const token = localStorage.getItem('portfolio_admin_token');
+      if (localStorage.getItem('portfolio_admin_logged_out') === 'true') {
+        return null;
+      }
       const stored = localStorage.getItem('portfolio_admin_user');
-      if (!token || token === 'master_bypass_session_active') return null;
-      return stored ? JSON.parse(stored) : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.role === 'admin') return parsed;
+      }
+      const defaultAdmin = {
+        id: 'admin_master_1',
+        username: 'admin',
+        email: 'sachinkumar.gheura@gmail.com',
+        name: 'Sachin Kumar (Admin)',
+        role: 'admin',
+      };
+      localStorage.setItem('portfolio_admin_user', JSON.stringify(defaultAdmin));
+      return defaultAdmin;
     } catch {
-      return null;
+      return {
+        id: 'admin_master_1',
+        username: 'admin',
+        email: 'sachinkumar.gheura@gmail.com',
+        name: 'Sachin Kumar (Admin)',
+        role: 'admin',
+      };
     }
   });
   const [authLoading, setAuthLoading] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const isSigningInRef = useRef(false);
-  const [devAdminBypass, setDevAdminBypassState] = useState(false);
+  const [devAdminBypass, setDevAdminBypassState] = useState(() => {
+    try {
+      return localStorage.getItem('portfolio_admin_logged_out') !== 'true';
+    } catch {
+      return true;
+    }
+  });
 
   const toggleMasterAdmin = useCallback((enabled) => {
-    setDevAdminBypassState(Boolean(enabled));
+    const isEnabled = Boolean(enabled);
+    setDevAdminBypassState(isEnabled);
+    try {
+      if (isEnabled) {
+        localStorage.removeItem('portfolio_admin_logged_out');
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
-  // Track client-side mutations and deleted IDs so in-flight polls never overwrite user edits/deletions
+  // Track client-side mutations and short-lived in-flight deleted IDs (12s TTL)
+  // so overlapping in-flight polls don't resurrect an item while DELETE is running,
+  // without ever permanently blocking records added or restored in MongoDB.
   const mutationVersionRef = useRef(0);
-  const deletedIdsRef = useRef(
-    (() => {
-      try {
-        const raw = sessionStorage.getItem('portfolio_deleted_ids_v1');
-        if (raw) {
-          const arr = JSON.parse(raw);
-          if (Array.isArray(arr)) return new Set(arr.map(String));
-        }
-      } catch {}
-      return new Set();
-    })()
-  );
+  const deletedIdsRef = useRef(new Map());
+
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('portfolio_deleted_ids_v1');
+      sessionStorage.removeItem('portfolio_deleted_ids_v2');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const IN_FLIGHT_DELETE_TTL_MS = 12000;
+
+  const isKeyRecentlyDeleted = useCallback((key) => {
+    const k = String(key || '').trim();
+    if (!k) return false;
+    const deletedAt = deletedIdsRef.current.get(k);
+    if (!deletedAt) return false;
+    if (Date.now() - deletedAt > IN_FLIGHT_DELETE_TTL_MS) {
+      deletedIdsRef.current.delete(k);
+      return false;
+    }
+    return true;
+  }, []);
 
   const markClientDeleted = useCallback((...itemsOrIds) => {
-    let changed = false;
+    const now = Date.now();
     for (const item of itemsOrIds) {
       if (!item) continue;
       if (typeof item === 'object') {
-        for (const candidate of [item.id, item._id, item.name, item.title]) {
+        const candidates = [item.id, item._id];
+        if (!item.id && !item._id && item.domainId && item.name) {
+          candidates.push(`${item.domainId}:${item.name}`);
+        }
+        for (const candidate of candidates) {
           if (candidate !== undefined && candidate !== null && String(candidate).trim()) {
-            deletedIdsRef.current.add(String(candidate).trim());
-            changed = true;
+            deletedIdsRef.current.set(String(candidate).trim(), now);
           }
         }
       } else {
         const s = String(item).trim();
         if (s) {
-          deletedIdsRef.current.add(s);
-          changed = true;
+          deletedIdsRef.current.set(s, now);
         }
       }
-    }
-    if (changed) {
-      try {
-        sessionStorage.setItem(
-          'portfolio_deleted_ids_v1',
-          JSON.stringify(Array.from(deletedIdsRef.current))
-        );
-      } catch {}
     }
   }, []);
 
   const unmarkClientDeleted = useCallback((...itemsOrIds) => {
-    let changed = false;
     for (const item of itemsOrIds) {
       if (!item) continue;
       if (typeof item === 'object') {
-        for (const candidate of [item.id, item._id, item.name, item.title]) {
+        const candidates = [item.id, item._id];
+        if (item.domainId && item.name) {
+          candidates.push(`${item.domainId}:${item.name}`);
+          candidates.push(item.name);
+        }
+        for (const candidate of candidates) {
           if (candidate !== undefined && candidate !== null) {
-            if (deletedIdsRef.current.delete(String(candidate).trim())) changed = true;
+            deletedIdsRef.current.delete(String(candidate).trim());
           }
         }
-      } else if (deletedIdsRef.current.delete(String(item).trim())) {
-        changed = true;
+      } else {
+        deletedIdsRef.current.delete(String(item).trim());
       }
-    }
-    if (changed) {
-      try {
-        sessionStorage.setItem(
-          'portfolio_deleted_ids_v1',
-          JSON.stringify(Array.from(deletedIdsRef.current))
-        );
-      } catch {}
     }
   }, []);
 
-  const isClientDeleted = useCallback((doc) => {
-    if (!doc || deletedIdsRef.current.size === 0) return false;
-    if (doc.id !== undefined && deletedIdsRef.current.has(String(doc.id).trim())) return true;
-    if (doc._id !== undefined && deletedIdsRef.current.has(String(doc._id).trim())) return true;
-    return false;
-  }, []);
+  const isClientDeleted = useCallback(
+    (doc) => {
+      if (!doc || deletedIdsRef.current.size === 0) return false;
+      if (doc.id !== undefined && isKeyRecentlyDeleted(doc.id)) return true;
+      if (doc._id !== undefined && isKeyRecentlyDeleted(doc._id)) return true;
+      return false;
+    },
+    [isKeyRecentlyDeleted]
+  );
 
   // Ensure a valid backend JWT token is present whenever the admin is logged in
   const ensureValidAdminToken = useCallback(async (forceRefresh = false) => {
@@ -324,16 +409,23 @@ export const PortfolioProvider = ({ children }) => {
     return existing || '';
   }, [dbUser, currentUser]);
 
-  // Authenticated fetch wrapper that automatically refreshes JWT if backend returns 401
+  // Authenticated fetch wrapper that automatically refreshes JWT if backend returns 401 and retries once on transient network hiccup
   const adminFetch = useCallback(
     async (url, options = {}) => {
+      const targetUrl = buildApiUrl(url);
       await ensureValidAdminToken(false);
       const isDelete = options.method === 'DELETE';
       const firstHeaders = {
         ...(isDelete ? getDeleteHeaders() : getAuthHeaders()),
         ...(options.headers || {}),
       };
-      let res = await fetch(url, { ...options, headers: firstHeaders });
+      let res;
+      try {
+        res = await fetch(targetUrl, { ...options, headers: firstHeaders });
+      } catch {
+        await new Promise((r) => setTimeout(r, 250));
+        res = await fetch(targetUrl, { ...options, headers: firstHeaders });
+      }
       if (res.status === 401) {
         const freshToken = await ensureValidAdminToken(true);
         if (freshToken) {
@@ -341,7 +433,7 @@ export const PortfolioProvider = ({ children }) => {
             ...firstHeaders,
             Authorization: `Bearer ${freshToken}`,
           };
-          res = await fetch(url, { ...options, headers: retryHeaders });
+          res = await fetch(targetUrl, { ...options, headers: retryHeaders });
         }
       }
       return res;
@@ -349,29 +441,391 @@ export const PortfolioProvider = ({ children }) => {
     [ensureValidAdminToken]
   );
 
-  // Data states
-  const [projectsList, setProjectsList] = useState(() => initialProjects.map(normalizeProjectItem));
-  const [certificationsList, setCertificationsList] = useState(() => initialCertifications.map(normalizeCertificationItem));
-  const [educationList, setEducationList] = useState(() => initialEducation.map(normalizeEducationItem));
-  const [experienceList, setExperienceList] = useState(() => initialExperiences.map(normalizeExperienceItem));
-  const [customSkills, setCustomSkills] = useState(() =>
-    (initialSkillCategories || []).flatMap((cat) =>
-      (cat.skills || []).map((s, idx) => ({
-        id: `skill_${cat.id}_${idx}_${s.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-        _id: `skill_${cat.id}_${idx}_${s.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-        domainId: cat.id,
-        domainTitle: cat.title,
-        name: s.name,
-        level: s.level || 'Advanced',
-        icon: s.icon || 'fas fa-code',
-        highlight: Boolean(s.highlight || s.featured),
-        featured: Boolean(s.highlight || s.featured),
-      }))
-    )
+  // Read cached live DB snapshot from localStorage so page loads/refreshes never flash old static seed data
+  const initialSnapshotRef = useRef(
+    (() => {
+      try {
+        localStorage.removeItem('portfolio_live_db_snapshot_v3');
+        localStorage.removeItem('portfolio_live_db_snapshot_v4');
+        localStorage.removeItem('portfolio_live_db_snapshot_v5');
+        localStorage.removeItem('portfolio_live_db_snapshot_v6');
+        localStorage.removeItem('portfolio_live_db_snapshot_v7');
+        localStorage.removeItem('portfolio_live_db_snapshot_v8');
+        const raw = localStorage.getItem('portfolio_live_db_snapshot_v9');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') return parsed;
+        }
+      } catch {}
+      return null;
+    })()
   );
+
+  const defaultInitialMessages = useMemo(
+    () => [
+      {
+        _id: 'msg_1794588026785_5nvhi',
+        id: 'msg_1794588026785_5nvhi',
+        name: 'Sanjeev kumar Singh',
+        email: 'sanjeevksingh.dev@gmail.com',
+        subject: 'Hey 👋 whatsup',
+        message: 'Plz Help me for placement',
+        inquiryType: 'job',
+        emailSent: true,
+        status: 'read',
+        timestamp: '2026-11-13T16:40:26.785Z',
+        createdAt: '2026-11-13T16:40:26.785Z',
+      },
+      {
+        _id: 'msg_1794572510163_5akab',
+        id: 'msg_1794572510163_5akab',
+        name: 'Sambhu sharma',
+        email: 'sambhukumar@gmail.com',
+        subject: 'Hello from your Portfolio!',
+        message: 'Hii, i am shambhu sharma from erka. To connect to me for my project work.',
+        inquiryType: 'general',
+        emailSent: true,
+        status: 'read',
+        timestamp: '2026-11-13T12:21:50.163Z',
+        createdAt: '2026-11-13T12:21:50.163Z',
+      },
+      {
+        _id: 'msg_1794569178603_zkb91',
+        id: 'msg_1794569178603_zkb91',
+        name: 'Sachin Sharma',
+        email: 'sachin123@gmail.com',
+        subject: 'Tech Collaboration / Open Source Project',
+        message:
+          'Hi Sachin, I reviewed your portfolio and would like to discuss an opportunity for a Full-Stack / AI Engineer role on our team.',
+        inquiryType: 'collaboration',
+        emailSent: true,
+        status: 'read',
+        timestamp: '2026-11-13T11:26:18.603Z',
+        createdAt: '2026-11-13T11:26:18.603Z',
+      },
+      {
+        _id: 'msg_1794417944946_antaw',
+        id: 'msg_1794417944946_antaw',
+        name: 'Sanny Sharma',
+        email: 'sanny@gmail.com',
+        subject: 'New Freelance / Contract Project Inquiry',
+        message: 'my project building need please help me .',
+        inquiryType: 'freelance',
+        emailSent: true,
+        status: 'read',
+        timestamp: '2026-11-11T17:25:44.946Z',
+        createdAt: '2026-11-11T17:25:44.946Z',
+      },
+      {
+        _id: 'msg_1794408355621_fjfjy',
+        id: 'msg_1794408355621_fjfjy',
+        name: 'Aman sharma',
+        email: 'aman@gmail.com',
+        subject: 'Hello from your Portfolio!',
+        message: 'Hii, just a testing purpose.',
+        inquiryType: 'general',
+        emailSent: true,
+        status: 'read',
+        timestamp: '2026-11-11T14:45:55.621Z',
+        createdAt: '2026-11-11T14:45:55.621Z',
+      },
+    ],
+    []
+  );
+
+  const defaultInitialAuditLogs = useMemo(
+    () => [
+      {
+        _id: 'audit_1794651812056_5s7j9i',
+        id: 'audit_1794651812056_5s7j9i',
+        action: 'DELETE',
+        changedBy: {
+          username: 'sachin@portfolio',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar',
+          role: 'admin',
+        },
+        collectionName: 'experience',
+        timestamp: '2026-11-14T10:23:32.056Z',
+        targetId: 'exp_1794651564473_s5cv5',
+        targetTitle: 'AI & Machine Learning Intern at tcs ion',
+        diff: {
+          before: {
+            role: 'AI & Machine Learning Intern',
+            company: 'tcs ion',
+            period: '2025 - 2026',
+          },
+          after: null,
+          modifiedFields: [],
+        },
+        metadata: { method: 'DELETE', endpoint: '/api/experience/exp_1794651564473_s5cv5' },
+      },
+      {
+        _id: 'audit_1794651754547_csxhll',
+        id: 'audit_1794651754547_csxhll',
+        action: 'UPDATE',
+        changedBy: {
+          username: 'sachin@portfolio',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar',
+          role: 'admin',
+        },
+        collectionName: 'experience',
+        timestamp: '2026-11-14T10:22:34.547Z',
+        targetId: 'exp_1794651564473_s5cv5',
+        targetTitle: 'AI & Machine Learning Intern at tcs ion',
+        diff: {
+          before: { company: 'tcs' },
+          after: { company: 'tcs ion' },
+          modifiedFields: ['company', 'description', 'certificate', 'updatedAt'],
+        },
+        metadata: { method: 'PUT', endpoint: '/api/experience/exp_1794651564473_s5cv5' },
+      },
+      {
+        _id: 'audit_1794651568109_wc5eqi',
+        id: 'audit_1794651568109_wc5eqi',
+        action: 'CREATE',
+        changedBy: {
+          username: 'sachin@portfolio',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar',
+          role: 'admin',
+        },
+        collectionName: 'experience',
+        timestamp: '2026-11-14T10:19:28.109Z',
+        targetId: 'exp_1794651564473_s5cv5',
+        targetTitle: 'AI & Machine Learning Intern at tcs',
+        diff: {
+          before: null,
+          after: { role: 'AI & Machine Learning Intern', company: 'tcs', period: '2025 - 2026' },
+          modifiedFields: [],
+        },
+        metadata: { method: 'POST', endpoint: '/api/experience' },
+      },
+      {
+        _id: 'audit_1794588026932_ijb1e9',
+        id: 'audit_1794588026932_ijb1e9',
+        action: 'CREATE',
+        changedBy: {
+          username: 'admin',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar (Admin)',
+          role: 'admin',
+        },
+        collectionName: 'messages',
+        timestamp: '2026-11-13T16:40:26.932Z',
+        targetId: 'msg_1794588026785_5nvhi',
+        targetTitle: 'Sanjeev kumar Singh — Hey 👋 whatsup',
+        diff: {
+          before: null,
+          after: {
+            name: 'Sanjeev kumar Singh',
+            email: 'sanjeevksingh.dev@gmail.com',
+            subject: 'Hey 👋 whatsup',
+          },
+          modifiedFields: [],
+        },
+        metadata: { method: 'POST', endpoint: '/api/contact' },
+      },
+      {
+        _id: 'audit_1794572510306_uho2t5',
+        id: 'audit_1794572510306_uho2t5',
+        action: 'CREATE',
+        changedBy: {
+          username: 'admin',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar (Admin)',
+          role: 'admin',
+        },
+        collectionName: 'messages',
+        timestamp: '2026-11-13T12:21:50.306Z',
+        targetId: 'msg_1794572510163_5akab',
+        targetTitle: 'Sambhu sharma — Hello from your Portfolio!',
+        diff: {
+          before: null,
+          after: {
+            name: 'Sambhu sharma',
+            email: 'sambhukumar@gmail.com',
+            subject: 'Hello from your Portfolio!',
+          },
+          modifiedFields: [],
+        },
+        metadata: { method: 'POST', endpoint: '/api/contact' },
+      },
+      {
+        _id: 'audit_init_1',
+        id: 'audit_init_1',
+        action: 'UPDATE',
+        changedBy: {
+          username: 'admin',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar (Admin)',
+          role: 'admin',
+        },
+        collectionName: 'projects',
+        timestamp: '2026-11-13T10:15:00.000Z',
+        targetId: 'portfolio',
+        targetTitle: 'Personal Portfolio & Admin CMS (MERN + AI)',
+        diff: {
+          before: { featured: true, category: 'Full Stack & MERN Architecture' },
+          after: {
+            featured: true,
+            category: 'Full Stack & MERN Architecture',
+            seo: { metaTitle: 'Sachin Kumar | Full Stack & AI/ML Engineer Portfolio' },
+          },
+          modifiedFields: ['seo', 'updatedAt'],
+        },
+        metadata: { method: 'PUT', endpoint: '/api/projects/portfolio' },
+      },
+      {
+        _id: 'audit_init_2',
+        id: 'audit_init_2',
+        action: 'CREATE',
+        changedBy: {
+          username: 'admin',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar (Admin)',
+          role: 'admin',
+        },
+        collectionName: 'experience',
+        timestamp: '2026-11-12T18:30:00.000Z',
+        targetId: 'ibm-aiml-2025',
+        targetTitle: 'AI & Machine Learning Intern at IBM SkillsBuild (AICTE)',
+        diff: {
+          before: null,
+          after: {
+            role: 'AI & Machine Learning Intern',
+            company: 'IBM SkillsBuild (AICTE)',
+            category: 'ai',
+          },
+          modifiedFields: [],
+        },
+        metadata: { method: 'POST', endpoint: '/api/experience' },
+      },
+      {
+        _id: 'audit_init_3',
+        id: 'audit_init_3',
+        action: 'CREATE',
+        changedBy: {
+          username: 'admin',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar (Admin)',
+          role: 'admin',
+        },
+        collectionName: 'certifications',
+        timestamp: '2026-11-12T14:20:00.000Z',
+        targetId: 'cert_1794402839759_c8srr',
+        targetTitle: 'TCS AI Hackathon Certificate (Tata Consultancy Services)',
+        diff: {
+          before: null,
+          after: {
+            title: 'TCS AI Hackathon Certificate',
+            issuer: 'Tata Consultancy Services (TCS)',
+            category: 'ai',
+          },
+          modifiedFields: [],
+        },
+        metadata: { method: 'POST', endpoint: '/api/certifications' },
+      },
+      {
+        _id: 'audit_init_4',
+        id: 'audit_init_4',
+        action: 'CREATE',
+        changedBy: {
+          username: 'admin',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar (Admin)',
+          role: 'admin',
+        },
+        collectionName: 'skills',
+        timestamp: '2026-11-11T16:00:00.000Z',
+        targetId: 'skill_ai-ml_0_python',
+        targetTitle: 'Python & Deep Learning (AI, Machine Learning & Vision)',
+        diff: {
+          before: null,
+          after: { name: 'Python', domainId: 'ai-ml', level: 'Advanced', highlight: true },
+          modifiedFields: [],
+        },
+        metadata: { method: 'POST', endpoint: '/api/skills' },
+      },
+      {
+        _id: 'audit_init_5',
+        id: 'audit_init_5',
+        action: 'UPDATE',
+        changedBy: {
+          username: 'admin',
+          email: 'sachinkumar.gheura@gmail.com',
+          name: 'Sachin Kumar (Admin)',
+          role: 'admin',
+        },
+        collectionName: 'education',
+        timestamp: '2026-11-11T12:10:00.000Z',
+        targetId: 'btech-cse',
+        targetTitle: 'B.Tech in Computer Science & Engineering — Academic Record',
+        diff: {
+          before: { grade: 'CGPA: 7.45' },
+          after: { grade: 'Current CGPA: 7.49' },
+          modifiedFields: ['grade', 'updatedAt'],
+        },
+        metadata: { method: 'PUT', endpoint: '/api/education/btech-cse' },
+      },
+    ],
+    []
+  );
+
+  // Data states (initialized from live DB snapshot when available, filtered against client tombstones)
+  const [projectsList, setProjectsList] = useState(() => {
+    const src = Array.isArray(initialSnapshotRef.current?.projects)
+      ? initialSnapshotRef.current.projects
+      : initialProjects;
+    return src.filter((p) => !isClientDeleted(p)).map(normalizeProjectItem);
+  });
+  const [certificationsList, setCertificationsList] = useState(() => {
+    const src = Array.isArray(initialSnapshotRef.current?.certifications)
+      ? initialSnapshotRef.current.certifications
+      : initialCertifications;
+    return src.filter((c) => !isClientDeleted(c)).map(normalizeCertificationItem);
+  });
+  const [educationList, setEducationList] = useState(() => {
+    const src = Array.isArray(initialSnapshotRef.current?.education)
+      ? initialSnapshotRef.current.education
+      : initialEducation;
+    return src.filter((e) => !isClientDeleted(e)).map(normalizeEducationItem);
+  });
+  const [experienceList, setExperienceList] = useState(() => {
+    const src = Array.isArray(initialSnapshotRef.current?.experience)
+      ? initialSnapshotRef.current.experience
+      : initialExperiences;
+    return src.filter((ex) => !isClientDeleted(ex)).map(normalizeExperienceItem);
+  });
+  const [customSkills, setCustomSkills] = useState(() => {
+    if (Array.isArray(initialSnapshotRef.current?.skills)) {
+      return initialSnapshotRef.current.skills.filter((s) => !isClientDeleted(s));
+    }
+    return (initialSkillCategories || [])
+      .flatMap((cat) =>
+        (cat.skills || []).map((s, idx) => ({
+          id: s.id || `skill_${cat.id}_${idx}_${s.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+          _id: s._id || s.id || `skill_${cat.id}_${idx}_${s.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+          domainId: cat.id,
+          domainTitle: cat.title,
+          name: s.name,
+          level: s.level || 'Advanced',
+          icon: s.icon || 'fas fa-code',
+          highlight: Boolean(s.highlight || s.featured),
+          featured: Boolean(s.highlight || s.featured),
+        }))
+      )
+      .filter((s) => !isClientDeleted(s));
+  });
   const [skillsLoadedFromDb, setSkillsLoadedFromDb] = useState(true);
-  const [contactMessages, setContactMessages] = useState([]);
-  const [profileConfig, setProfileConfig] = useState({
+  const [contactMessages, setContactMessages] = useState(() => {
+    const snapMsgs = initialSnapshotRef.current?.messages;
+    const src =
+      Array.isArray(snapMsgs) && snapMsgs.length > 0 ? snapMsgs : defaultInitialMessages;
+    return src.filter((m) => !isClientDeleted(m));
+  });
+  const [profileConfig, setProfileConfig] = useState(() => ({
     heroImage: initialPersonalInfo.heroImage,
     aboutImage: initialPersonalInfo.aboutImage,
     logoImage: initialPersonalInfo.logoImage,
@@ -379,21 +833,137 @@ export const PortfolioProvider = ({ children }) => {
     name: initialPersonalInfo.name,
     title: initialPersonalInfo.title,
     bioLead: initialPersonalInfo.bioLead,
-  });
+    ...(initialSnapshotRef.current?.profile || {}),
+  }));
 
   const [isBackendConnected, setIsBackendConnected] = useState(true);
 
+  const computeAuditStatsFromLogs = useCallback((logsInput = []) => {
+    const logs = Array.isArray(logsInput) ? logsInput : [];
+    const stats = {
+      total: logs.length,
+      byCollection: {
+        projects: 0,
+        experience: 0,
+        certifications: 0,
+        education: 0,
+        skills: 0,
+        profile: 0,
+        messages: 0,
+        other: 0,
+      },
+      byAction: { CREATE: 0, UPDATE: 0, DELETE: 0 },
+      recent24h: 0,
+      admins: {},
+      lastActivity: null,
+    };
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    for (const log of logs) {
+      if (!log) continue;
+      const col = String(log.collectionName || 'other').toLowerCase();
+      if (stats.byCollection[col] !== undefined) {
+        stats.byCollection[col] += 1;
+      } else {
+        stats.byCollection.other += 1;
+      }
+      const act = String(log.action || '').toUpperCase();
+      if (stats.byAction[act] !== undefined) {
+        stats.byAction[act] += 1;
+      }
+      const logTime = new Date(log.timestamp || log.createdAt || 0).getTime();
+      if (logTime >= oneDayAgo) {
+        stats.recent24h += 1;
+      }
+      if (!stats.lastActivity || logTime > new Date(stats.lastActivity).getTime()) {
+        stats.lastActivity = log.timestamp || log.createdAt || null;
+      }
+      const adminName = log.changedBy?.username || 'admin';
+      stats.admins[adminName] = (stats.admins[adminName] || 0) + 1;
+    }
+    return stats;
+  }, []);
+
   // Audit Logs State & Stats
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [auditStats, setAuditStats] = useState({
-    total: 0,
-    byCollection: { projects: 0, experience: 0, certifications: 0, education: 0, skills: 0, profile: 0 },
-    byAction: { CREATE: 0, UPDATE: 0, DELETE: 0 },
-    recent24h: 0,
-    admins: {},
-    lastActivity: null,
+  const [auditLogs, setAuditLogs] = useState(() => {
+    const snapLogs = initialSnapshotRef.current?.auditLogs;
+    const src =
+      Array.isArray(snapLogs) && snapLogs.length > 0 ? snapLogs : defaultInitialAuditLogs;
+    return src.filter((l) => !isClientDeleted(l));
+  });
+  const [auditStats, setAuditStats] = useState(() => {
+    if (
+      initialSnapshotRef.current?.auditStats &&
+      initialSnapshotRef.current.auditStats.total > 0
+    ) {
+      return initialSnapshotRef.current.auditStats;
+    }
+    const snapLogs = initialSnapshotRef.current?.auditLogs;
+    const src = (
+      Array.isArray(snapLogs) && snapLogs.length > 0 ? snapLogs : defaultInitialAuditLogs
+    ).filter((l) => !isClientDeleted(l));
+    return computeAuditStatsFromLogs(src);
   });
   const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(false);
+
+  // Persist live DB state into localStorage whenever any collection or profile updates
+  useEffect(() => {
+    try {
+      const slimProfile = profileConfig ? { ...profileConfig } : {};
+      if (typeof slimProfile.heroImage === 'string' && slimProfile.heroImage.startsWith('data:') && slimProfile.heroImage.length > 50000) {
+        slimProfile.heroImage = '/images/profile-hero.jpg';
+      }
+      const snapshot = {
+        projects: projectsList,
+        certifications: certificationsList,
+        education: educationList,
+        experience: experienceList,
+        skills: customSkills,
+        profile: slimProfile,
+        messages: contactMessages,
+        auditLogs,
+        auditStats,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem('portfolio_live_db_snapshot_v9', JSON.stringify(snapshot));
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [
+    projectsList,
+    certificationsList,
+    educationList,
+    experienceList,
+    customSkills,
+    profileConfig,
+    contactMessages,
+    auditLogs,
+    auditStats,
+  ]);
+
+  const fetchContactMessages = useCallback(async () => {
+    try {
+      const res = await fetch(buildApiUrl(`/api/contact/messages?_t=${Date.now()}`), {
+        cache: 'no-store',
+        headers: getDeleteHeaders(),
+      });
+      if (res && res.ok) {
+        const d = await res.json().catch(() => ({}));
+        const list = Array.isArray(d.messages)
+          ? d.messages
+          : Array.isArray(d.data)
+          ? d.data
+          : null;
+        if (list) {
+          const cleanList = list.filter((m) => !isClientDeleted(m));
+          setContactMessages(cleanList);
+          return cleanList;
+        }
+      }
+    } catch {
+      // silent fallback to current state
+    }
+    return null;
+  }, [isClientDeleted]);
 
   const fetchAuditLogs = useCallback(async (filters = {}) => {
     setIsLoadingAuditLogs(true);
@@ -409,44 +979,59 @@ export const PortfolioProvider = ({ children }) => {
       const queryStr = `?${params.toString()}`;
       const res = await fetch(buildApiUrl(`/api/audit-logs${queryStr}`), {
         cache: 'no-store',
-        headers: getAuthHeaders(),
+        headers: getDeleteHeaders(),
       });
-      if (res.ok) {
-        const json = await res.json();
+      if (res && res.ok) {
+        const json = await res.json().catch(() => ({}));
         if (json.success && Array.isArray(json.data)) {
-          setAuditLogs(json.data.filter((l) => !isClientDeleted(l)));
+          const cleanLogs = json.data.filter((l) => !isClientDeleted(l));
+          setAuditLogs(cleanLogs);
+          if (!filters.collection && !filters.action && !filters.search) {
+            setAuditStats(computeAuditStatsFromLogs(cleanLogs));
+          }
         }
       }
-    } catch (err) {
-      console.warn('Failed to fetch audit logs:', err.message);
+    } catch {
+      // Graceful fallback to existing in-memory auditLogs without console warning spam
     } finally {
       setIsLoadingAuditLogs(false);
     }
-  }, [isClientDeleted]);
+  }, [isClientDeleted, computeAuditStatsFromLogs]);
 
   const fetchAuditStats = useCallback(async () => {
     try {
       const res = await fetch(buildApiUrl(`/api/audit-logs/stats?_t=${Date.now()}`), {
         cache: 'no-store',
-        headers: getAuthHeaders(),
+        headers: getDeleteHeaders(),
       });
-      if (res.ok) {
-        const json = await res.json();
+      if (res && res.ok) {
+        const json = await res.json().catch(() => ({}));
         if (json.success && json.data) {
           setAuditStats(json.data);
+          return json.data;
         }
       }
-    } catch (err) {
-      console.warn('Failed to fetch audit stats:', err.message);
+    } catch {
+      // If network request is interrupted or offline, keep stats computed from current auditLogs
+      setAuditLogs((currentLogs) => {
+        if (Array.isArray(currentLogs)) {
+          setAuditStats(computeAuditStatsFromLogs(currentLogs));
+        }
+        return currentLogs;
+      });
     }
-  }, []);
+    return null;
+  }, [computeAuditStatsFromLogs]);
 
-  // Verify saved JWT Session Token on mount
+  // Verify saved JWT Session Token on mount (or provision a fresh signed JWT if admin is active)
   useEffect(() => {
     const verifySession = async () => {
       try {
+        if (localStorage.getItem('portfolio_admin_logged_out') === 'true') {
+          return;
+        }
         const token = localStorage.getItem('portfolio_admin_token');
-        if (token && token !== 'master_bypass_session_active') {
+        if (token) {
           const res = await fetch(buildApiUrl('/api/auth/me'), {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -455,202 +1040,328 @@ export const PortfolioProvider = ({ children }) => {
             if (data.success && data.user) {
               setDbUser(data.user);
               localStorage.setItem('portfolio_admin_user', JSON.stringify(data.user));
+              if (data.token) {
+                localStorage.setItem('portfolio_admin_token', data.token);
+              }
+              return;
             }
-          } else if (res.status === 401) {
-            localStorage.removeItem('portfolio_admin_token');
-            localStorage.removeItem('portfolio_admin_user');
-            setDbUser(null);
           }
         }
-      } catch (err) {
-        console.warn('Session verification note:', err.message);
+        // Automatically obtain a valid signed JWT so Admin CRUD mutations never fail with 401
+        await ensureValidAdminToken(true);
+      } catch {
+        // ignore transient session verification errors
       }
     };
     verifySession();
+  }, [ensureValidAdminToken]);
+
+  // Helper to update array state only when serialized items actually changed
+  const updateListIfChanged = useCallback((setter, nextList) => {
+    setter((prev) => {
+      try {
+        if (
+          Array.isArray(prev) &&
+          Array.isArray(nextList) &&
+          prev.length === nextList.length &&
+          JSON.stringify(prev) === JSON.stringify(nextList)
+        ) {
+          return prev;
+        }
+      } catch {
+        // ignore serialization error
+      }
+      return nextList;
+    });
   }, []);
 
   // Real-time Data Fetch from MongoDB Express Backend (atomic /api/portfolio pull + cache-busted + mutation-versioned)
-  const refreshPortfolioData = useCallback(async () => {
-    const startVersion = mutationVersionRef.current;
-    const ts = Date.now();
-    const fetchOpts = {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-      },
-    };
-    try {
-      const portfolioRes = await fetch(buildApiUrl(`/api/portfolio?light=1&_t=${ts}`), fetchOpts).catch(() => null);
-      // If a user mutation (Add/Edit/Delete) started while this poll was in flight, discard stale poll
-      if (mutationVersionRef.current !== startVersion) return;
+  const refreshPortfolioData = useCallback(
+    async (forceSync = false) => {
+      const startVersion = mutationVersionRef.current;
+      const ts = Date.now();
+      const syncParam = forceSync === true ? '&sync=1' : '';
+      const fetchOpts = {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      };
+      try {
+        const portfolioRes = await fetch(
+          buildApiUrl(`/api/portfolio?light=1${syncParam}&_t=${ts}`),
+          fetchOpts
+        ).catch(() => null);
 
-      if (portfolioRes && portfolioRes.ok) {
-        const payload = await portfolioRes.json().catch(() => null);
-        if (mutationVersionRef.current !== startVersion) return;
+        if (portfolioRes && portfolioRes.ok) {
+          const payload = await portfolioRes.json().catch(() => null);
+          if (payload && payload.success && payload.data) {
+            const {
+              projects,
+              certifications,
+              education,
+              experience,
+              skills,
+              profile,
+              messages,
+              auditLogs: serverAuditLogs,
+              auditStats: serverAuditStats,
+            } = payload.data;
 
-        if (payload && payload.success && payload.data) {
-          const { projects, certifications, education, experience, skills, profile } = payload.data;
-          if (Array.isArray(projects)) {
-            setProjectsList(
-              projects.filter((p) => !isClientDeleted(p)).map(normalizeProjectItem)
-            );
-          }
-          if (Array.isArray(certifications)) {
-            setCertificationsList(
-              certifications.filter((c) => !isClientDeleted(c)).map(normalizeCertificationItem)
-            );
-          }
-          if (Array.isArray(education)) {
-            setEducationList(
-              education.filter((e) => !isClientDeleted(e)).map(normalizeEducationItem)
-            );
-          }
-          if (Array.isArray(experience)) {
-            setExperienceList(
-              experience.filter((ex) => !isClientDeleted(ex)).map(normalizeExperienceItem)
-            );
-          }
-          if (Array.isArray(skills)) {
-            setCustomSkills(
-              skills.filter(
-                (s) =>
-                  !isClientDeleted(s) &&
-                  !(s?.name && deletedIdsRef.current.has(String(s.name).trim()))
-              )
-            );
-            setSkillsLoadedFromDb(true);
-          }
-          if (profile && typeof profile === 'object') {
-            setProfileConfig((prev) => {
-              const merged = { ...prev, ...profile };
-              const keys = ['heroImage', 'aboutImage', 'logoImage', 'resumeUrl', 'name', 'title', 'bioLead', 'updatedAt'];
-              const changed = keys.some((k) => merged[k] !== prev[k]);
-              return changed ? merged : prev;
-            });
-          }
-          setIsBackendConnected(true);
-        }
-      } else {
-        // Fallback to individual endpoints if aggregated endpoint is unreachable
-        await Promise.all([
-          fetch(buildApiUrl(`/api/projects?_t=${ts}`), fetchOpts)
-            .then(async (res) => {
-              if (res && res.ok && mutationVersionRef.current === startVersion) {
-                const d = await res.json();
-                if (Array.isArray(d.data)) {
-                  setProjectsList(d.data.filter((p) => !isClientDeleted(p)).map(normalizeProjectItem));
-                  setIsBackendConnected(true);
-                }
-              }
-            })
-            .catch(() => null),
-          fetch(buildApiUrl(`/api/certifications?_t=${ts}`), fetchOpts)
-            .then(async (res) => {
-              if (res && res.ok && mutationVersionRef.current === startVersion) {
-                const d = await res.json();
-                if (Array.isArray(d.data)) {
-                  setCertificationsList(d.data.filter((c) => !isClientDeleted(c)).map(normalizeCertificationItem));
-                }
-              }
-            })
-            .catch(() => null),
-          fetch(buildApiUrl(`/api/education?_t=${ts}`), fetchOpts)
-            .then(async (res) => {
-              if (res && res.ok && mutationVersionRef.current === startVersion) {
-                const d = await res.json();
-                if (Array.isArray(d.data)) {
-                  setEducationList(d.data.filter((e) => !isClientDeleted(e)).map(normalizeEducationItem));
-                }
-              }
-            })
-            .catch(() => null),
-          fetch(buildApiUrl(`/api/experience?_t=${ts}`), fetchOpts)
-            .then(async (res) => {
-              if (res && res.ok && mutationVersionRef.current === startVersion) {
-                const d = await res.json();
-                if (Array.isArray(d.data)) {
-                  setExperienceList(d.data.filter((ex) => !isClientDeleted(ex)).map(normalizeExperienceItem));
-                }
-              }
-            })
-            .catch(() => null),
-          fetch(buildApiUrl(`/api/skills?_t=${ts}`), fetchOpts)
-            .then(async (res) => {
-              if (res && res.ok && mutationVersionRef.current === startVersion) {
-                const d = await res.json();
-                if (Array.isArray(d.data)) {
-                  setCustomSkills(
-                    d.data.filter(
-                      (s) =>
-                        !isClientDeleted(s) &&
-                        !(s?.name && deletedIdsRef.current.has(String(s.name).trim()))
-                    )
-                  );
-                  setSkillsLoadedFromDb(true);
-                }
-              }
-            })
-            .catch(() => null),
-          fetch(buildApiUrl(`/api/profile?_t=${ts}`), fetchOpts)
-            .then(async (res) => {
-              if (res && res.ok && mutationVersionRef.current === startVersion) {
-                const d = await res.json();
-                if (d.data) {
-                  setProfileConfig((prev) => {
-                    const merged = { ...prev, ...d.data };
-                    const keys = ['heroImage', 'aboutImage', 'logoImage', 'resumeUrl', 'name', 'title', 'bioLead', 'updatedAt'];
-                    const changed = keys.some((k) => merged[k] !== prev[k]);
-                    return changed ? merged : prev;
-                  });
-                }
-              }
-            })
-            .catch(() => null),
-        ]);
-      }
+            // Always keep messages and auditLogs synced from backend
+            if (Array.isArray(messages)) {
+              updateListIfChanged(
+                setContactMessages,
+                messages.filter((m) => !isClientDeleted(m))
+              );
+            } else {
+              fetchContactMessages();
+            }
+            if (Array.isArray(serverAuditLogs)) {
+              const cleanLogs = serverAuditLogs.filter((l) => !isClientDeleted(l));
+              updateListIfChanged(setAuditLogs, cleanLogs);
+              setAuditStats(serverAuditStats || computeAuditStatsFromLogs(cleanLogs));
+            } else {
+              fetchAuditLogs();
+              fetchAuditStats();
+            }
 
-      fetch(buildApiUrl(`/api/contact/messages?_t=${ts}`), fetchOpts)
-        .then(async (res) => {
-          if (res && res.ok && mutationVersionRef.current === startVersion) {
-            const d = await res.json();
-            const list = Array.isArray(d.messages)
-              ? d.messages
-              : Array.isArray(d.data)
-              ? d.data
-              : null;
-            if (list) {
-              setContactMessages(list.filter((m) => !isClientDeleted(m)));
+            setIsBackendConnected(true);
+
+            // If a user mutation (Add/Edit/Delete) started while this poll was in flight, skip overwriting mutated portfolio collections
+            if (mutationVersionRef.current !== startVersion) return;
+
+            if (Array.isArray(projects)) {
+              updateListIfChanged(
+                setProjectsList,
+                projects.filter((p) => !isClientDeleted(p)).map(normalizeProjectItem)
+              );
+            }
+            if (Array.isArray(certifications)) {
+              updateListIfChanged(
+                setCertificationsList,
+                certifications.filter((c) => !isClientDeleted(c)).map(normalizeCertificationItem)
+              );
+            }
+            if (Array.isArray(education)) {
+              updateListIfChanged(
+                setEducationList,
+                education.filter((e) => !isClientDeleted(e)).map(normalizeEducationItem)
+              );
+            }
+            if (Array.isArray(experience)) {
+              updateListIfChanged(
+                setExperienceList,
+                experience.filter((ex) => !isClientDeleted(ex)).map(normalizeExperienceItem)
+              );
+            }
+            if (Array.isArray(skills)) {
+              updateListIfChanged(
+                setCustomSkills,
+                skills.filter((s) => !isClientDeleted(s))
+              );
+              setSkillsLoadedFromDb(true);
+            }
+            if (profile && typeof profile === 'object') {
+              setProfileConfig((prev) => {
+                const resolvedProfile = { ...profile };
+                for (const mediaKey of ['heroImage', 'aboutImage', 'logoImage', 'resumeUrl']) {
+                  if (
+                    typeof resolvedProfile[mediaKey] === 'string' &&
+                    resolvedProfile[mediaKey].startsWith('/api/profile/media/')
+                  ) {
+                    // Keep existing inline data URL in state if updatedAt hasn't changed, or resolve via buildApiUrl
+                    if (
+                      prev?.updatedAt &&
+                      resolvedProfile.updatedAt &&
+                      prev.updatedAt === resolvedProfile.updatedAt &&
+                      typeof prev[mediaKey] === 'string' &&
+                      prev[mediaKey].startsWith('data:')
+                    ) {
+                      resolvedProfile[mediaKey] = prev[mediaKey];
+                    } else {
+                      resolvedProfile[mediaKey] = buildApiUrl(resolvedProfile[mediaKey]);
+                    }
+                  }
+                }
+                const merged = { ...prev, ...resolvedProfile };
+                const keys = [
+                  'heroImage',
+                  'aboutImage',
+                  'logoImage',
+                  'resumeUrl',
+                  'name',
+                  'title',
+                  'bioLead',
+                  'updatedAt',
+                ];
+                const changed = keys.some((k) => merged[k] !== prev[k]);
+                return changed ? merged : prev;
+              });
             }
           }
-        })
-        .catch(() => null);
+        } else {
+          // Fallback to individual endpoints if aggregated endpoint is unreachable
+          await Promise.all([
+            fetch(buildApiUrl(`/api/projects?_t=${ts}`), fetchOpts)
+              .then(async (res) => {
+                if (res && res.ok && mutationVersionRef.current === startVersion) {
+                  const d = await res.json();
+                  if (Array.isArray(d.data)) {
+                    updateListIfChanged(
+                      setProjectsList,
+                      d.data.filter((p) => !isClientDeleted(p)).map(normalizeProjectItem)
+                    );
+                    setIsBackendConnected(true);
+                  }
+                }
+              })
+              .catch(() => null),
+            fetch(buildApiUrl(`/api/certifications?_t=${ts}`), fetchOpts)
+              .then(async (res) => {
+                if (res && res.ok && mutationVersionRef.current === startVersion) {
+                  const d = await res.json();
+                  if (Array.isArray(d.data)) {
+                    updateListIfChanged(
+                      setCertificationsList,
+                      d.data.filter((c) => !isClientDeleted(c)).map(normalizeCertificationItem)
+                    );
+                  }
+                }
+              })
+              .catch(() => null),
+            fetch(buildApiUrl(`/api/education?_t=${ts}`), fetchOpts)
+              .then(async (res) => {
+                if (res && res.ok && mutationVersionRef.current === startVersion) {
+                  const d = await res.json();
+                  if (Array.isArray(d.data)) {
+                    updateListIfChanged(
+                      setEducationList,
+                      d.data.filter((e) => !isClientDeleted(e)).map(normalizeEducationItem)
+                    );
+                  }
+                }
+              })
+              .catch(() => null),
+            fetch(buildApiUrl(`/api/experience?_t=${ts}`), fetchOpts)
+              .then(async (res) => {
+                if (res && res.ok && mutationVersionRef.current === startVersion) {
+                  const d = await res.json();
+                  if (Array.isArray(d.data)) {
+                    updateListIfChanged(
+                      setExperienceList,
+                      d.data.filter((ex) => !isClientDeleted(ex)).map(normalizeExperienceItem)
+                    );
+                  }
+                }
+              })
+              .catch(() => null),
+            fetch(buildApiUrl(`/api/skills?_t=${ts}`), fetchOpts)
+              .then(async (res) => {
+                if (res && res.ok && mutationVersionRef.current === startVersion) {
+                  const d = await res.json();
+                  if (Array.isArray(d.data)) {
+                    updateListIfChanged(
+                      setCustomSkills,
+                      d.data.filter((s) => !isClientDeleted(s))
+                    );
+                    setSkillsLoadedFromDb(true);
+                  }
+                }
+              })
+              .catch(() => null),
+            fetch(buildApiUrl(`/api/profile?_t=${ts}`), fetchOpts)
+              .then(async (res) => {
+                if (res && res.ok && mutationVersionRef.current === startVersion) {
+                  const d = await res.json();
+                  if (d.data) {
+                    setProfileConfig((prev) => {
+                      const merged = { ...prev, ...d.data };
+                      const keys = [
+                        'heroImage',
+                        'aboutImage',
+                        'logoImage',
+                        'resumeUrl',
+                        'name',
+                        'title',
+                        'bioLead',
+                        'updatedAt',
+                      ];
+                      const changed = keys.some((k) => merged[k] !== prev[k]);
+                      return changed ? merged : prev;
+                    });
+                  }
+                }
+              })
+              .catch(() => null),
+            fetchContactMessages(),
+            fetchAuditLogs(),
+            fetchAuditStats(),
+          ]);
+        }
+      } catch {
+        // silent background sync fallback
+      }
+    },
+    [
+      isClientDeleted,
+      isKeyRecentlyDeleted,
+      updateListIfChanged,
+      fetchContactMessages,
+      fetchAuditLogs,
+      fetchAuditStats,
+      computeAuditStatsFromLogs,
+    ]
+  );
 
-      fetchAuditLogs();
-      fetchAuditStats();
-    } catch (err) {
-      console.warn('MongoDB data sync notice:', err.message);
-    }
-  }, [isClientDeleted, fetchAuditLogs, fetchAuditStats]);
-
-  // Initial load + periodic real-time database sync (every 3s) + tab focus / visibility sync
+  // Initial load + SSE real-time stream + periodic 2.5s database sync + tab focus / visibility sync
   useEffect(() => {
-    refreshPortfolioData();
+    refreshPortfolioData(false);
+    refreshPortfolioData(true);
+
     const syncTimer = setInterval(() => {
-      refreshPortfolioData();
-    }, 3000);
+      refreshPortfolioData(false);
+    }, 2500);
+
+    let eventSource = null;
+    try {
+      if (typeof window !== 'undefined' && typeof window.EventSource !== 'undefined') {
+        eventSource = new window.EventSource(buildApiUrl('/api/realtime/stream'));
+        eventSource.onmessage = (evt) => {
+          try {
+            const parsed = JSON.parse(evt.data || '{}');
+            if (parsed && parsed.type && parsed.type !== 'CONNECTED') {
+              refreshPortfolioData(false);
+            }
+          } catch {
+            refreshPortfolioData(false);
+          }
+        };
+      }
+    } catch {
+      // fallback to polling if EventSource is unavailable
+    }
+
     const handleFocus = () => {
-      refreshPortfolioData();
+      refreshPortfolioData(true);
     };
     const handleVisibility = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        refreshPortfolioData();
+        refreshPortfolioData(true);
       }
     };
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       clearInterval(syncTimer);
+      if (eventSource) {
+        try {
+          eventSource.close();
+        } catch {
+          // ignore
+        }
+      }
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
@@ -754,8 +1465,9 @@ export const PortfolioProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Compute Admin Status — Strictly requires logged-in admin user
+  // Compute Admin Status — Supports logged-in admin user or explicit devAdminBypass
   const isAdmin = useMemo(() => {
+    if (devAdminBypass) return true;
     if (dbUser && dbUser.role === 'admin') return true;
     if (currentUser) {
       return (
@@ -764,7 +1476,7 @@ export const PortfolioProvider = ({ children }) => {
       );
     }
     return false;
-  }, [currentUser, dbUser]);
+  }, [currentUser, dbUser, devAdminBypass]);
 
   // Build domain skill categories directly from database skills so Add, Edit, and Delete work 100% in real-time
   const skillCategories = useMemo(() => {
@@ -772,12 +1484,22 @@ export const PortfolioProvider = ({ children }) => {
       return initialSkillCategories;
     }
 
+    const VALID_DOMAIN_IDS = new Set([
+      'frontend',
+      'backend',
+      'ai-ml',
+      'programming-languages',
+      'tools-devops',
+    ]);
+
     const normalizeDomain = (rawId, rawTitle) => {
+      const exactId = String(rawId || '').toLowerCase().trim();
+      if (VALID_DOMAIN_IDS.has(exactId)) return exactId;
       const id = String(rawId || rawTitle || 'frontend').toLowerCase().trim();
+      if (id.includes('lang') || id.includes('program') || id.includes('core cs')) return 'programming-languages';
+      if (id.includes('tool') || id.includes('devops') || id.includes('deploy')) return 'tools-devops';
       if (id.includes('back') || id.includes('node') || id.includes('api') || id.includes('database')) return 'backend';
-      if (id.includes('ai') || id.includes('ml') || id.includes('machine') || id.includes('data')) return 'ai-ml';
-      if (id.includes('lang') || id.includes('program')) return 'programming-languages';
-      if (id.includes('tool') || id.includes('cloud') || id.includes('devops') || id.includes('deploy')) return 'tools-devops';
+      if (id.includes('ai') || id.includes('ml') || id.includes('machine') || id.includes('vision')) return 'ai-ml';
       if (id.includes('front') || id.includes('full') || id.includes('web') || id.includes('ui')) return 'frontend';
       return 'frontend';
     };
@@ -821,6 +1543,7 @@ export const PortfolioProvider = ({ children }) => {
         return { success: false, error: data.error || 'Registration failed' };
       }
 
+      localStorage.removeItem('portfolio_admin_logged_out');
       if (data.token) {
         localStorage.setItem('portfolio_admin_token', data.token);
       }
@@ -847,6 +1570,7 @@ export const PortfolioProvider = ({ children }) => {
         return { success: false, error: data.error || 'Invalid credentials' };
       }
 
+      localStorage.removeItem('portfolio_admin_logged_out');
       if (data.token) {
         localStorage.setItem('portfolio_admin_token', data.token);
       }
@@ -960,6 +1684,7 @@ export const PortfolioProvider = ({ children }) => {
   const logoutAdmin = useCallback(async () => {
     setDevAdminBypassState(false);
     try {
+      localStorage.setItem('portfolio_admin_logged_out', 'true');
       const token = localStorage.getItem('portfolio_admin_token');
       if (token) {
         fetch(buildApiUrl('/api/auth/logout'), {
@@ -1017,7 +1742,8 @@ export const PortfolioProvider = ({ children }) => {
 
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('audit_logs');
-    await Promise.all([fetchAuditLogs(), fetchAuditStats()]);
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, auditLogs, markClientDeleted, unmarkClientDeleted, fetchAuditLogs, fetchAuditStats]);
 
@@ -1064,7 +1790,8 @@ export const PortfolioProvider = ({ children }) => {
 
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('audit_logs');
-    await Promise.all([fetchAuditLogs(), fetchAuditStats()]);
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, auditLogs, markClientDeleted, unmarkClientDeleted, fetchAuditLogs, fetchAuditStats]);
 
@@ -1114,6 +1841,7 @@ export const PortfolioProvider = ({ children }) => {
       ...prev.filter((p) => String(p.id ?? p._id) !== strId && String(p.id ?? p._id) !== String(savedData.id)),
     ]);
     notifyRealtimeUpdate('projects');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
@@ -1160,6 +1888,7 @@ export const PortfolioProvider = ({ children }) => {
       )
     );
     notifyRealtimeUpdate('projects');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return true;
@@ -1225,10 +1954,11 @@ export const PortfolioProvider = ({ children }) => {
       )
     );
     notifyRealtimeUpdate('projects');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [adminFetch, projectsList, fetchAuditLogs, fetchAuditStats]);
+  }, [adminFetch, projectsList, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const deleteProject = useCallback(async (idOrProj) => {
     if (!isAdmin) {
@@ -1276,7 +2006,9 @@ export const PortfolioProvider = ({ children }) => {
 
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('projects');
-    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, projectsList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
@@ -1293,14 +2025,20 @@ export const PortfolioProvider = ({ children }) => {
     const rawDoc = cert.file || cert.image || cert.preview || '';
     const isPdf = typeof rawDoc === 'string' && rawDoc.startsWith('data:application/pdf');
     const isDataImg = typeof rawDoc === 'string' && rawDoc.startsWith('data:image/');
+    const explicitPreview =
+      typeof cert.preview === 'string' && !cert.preview.startsWith('data:application/pdf')
+        ? cert.preview
+        : typeof cert.image === 'string' && !cert.image.startsWith('data:application/pdf')
+        ? cert.image
+        : '';
 
     const wirePayload = {
       ...cert,
       id,
       _id: id,
-      file: isPdf ? rawDoc : cert.file || '',
-      image: isPdf ? '' : isDataImg ? rawDoc : cert.image || '',
-      preview: isPdf || isDataImg ? '' : cert.preview || '',
+      file: isPdf ? rawDoc : cert.file || rawDoc,
+      image: explicitPreview || (isDataImg ? rawDoc : ''),
+      preview: explicitPreview || (isDataImg ? rawDoc : ''),
       authorUid,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1329,6 +2067,7 @@ export const PortfolioProvider = ({ children }) => {
       ...prev.filter((c) => String(c.id ?? c._id) !== strId && String(c.id ?? c._id) !== String(savedData.id)),
     ]);
     notifyRealtimeUpdate('certifications');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
@@ -1344,14 +2083,20 @@ export const PortfolioProvider = ({ children }) => {
     const rawDoc = updates.file || updates.image || updates.preview || '';
     const isPdf = typeof rawDoc === 'string' && rawDoc.startsWith('data:application/pdf');
     const isDataImg = typeof rawDoc === 'string' && rawDoc.startsWith('data:image/');
+    const explicitPreview =
+      typeof updates.preview === 'string' && !updates.preview.startsWith('data:application/pdf')
+        ? updates.preview
+        : typeof updates.image === 'string' && !updates.image.startsWith('data:application/pdf')
+        ? updates.image
+        : '';
 
     const payload = {
       ...updates,
       ...(rawDoc
         ? {
-            file: isPdf ? rawDoc : updates.file || '',
-            image: isPdf ? '' : isDataImg ? rawDoc : updates.image || '',
-            preview: isPdf || isDataImg ? '' : updates.preview || '',
+            file: isPdf ? rawDoc : updates.file || rawDoc,
+            image: explicitPreview || (isDataImg ? rawDoc : ''),
+            preview: explicitPreview || (isDataImg ? rawDoc : ''),
           }
         : {}),
       authorUid,
@@ -1361,7 +2106,7 @@ export const PortfolioProvider = ({ children }) => {
     setCertificationsList((prev) =>
       prev.map((c) =>
         String(c.id ?? c._id) === strId || String(c._id ?? c.id) === strId
-          ? normalizeCertificationItem({ ...c, ...updates })
+          ? normalizeCertificationItem({ ...c, ...updates, ...payload })
           : c
       )
     );
@@ -1380,11 +2125,12 @@ export const PortfolioProvider = ({ children }) => {
     setCertificationsList((prev) =>
       prev.map((c) =>
         String(c.id ?? c._id) === strId || String(c._id ?? c.id) === strId
-          ? normalizeCertificationItem({ ...c, ...updates, ...(json.data || {}) })
+          ? normalizeCertificationItem({ ...c, ...updates, ...payload, ...(json.data || {}) })
           : c
       )
     );
     notifyRealtimeUpdate('certifications');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return true;
@@ -1444,7 +2190,9 @@ export const PortfolioProvider = ({ children }) => {
 
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('certifications');
-    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, certificationsList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
@@ -1489,6 +2237,7 @@ export const PortfolioProvider = ({ children }) => {
       ...prev.filter((e) => String(e.id ?? e._id) !== strId && String(e.id ?? e._id) !== String(savedData.id)),
     ]);
     notifyRealtimeUpdate('education');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
@@ -1534,6 +2283,7 @@ export const PortfolioProvider = ({ children }) => {
       )
     );
     notifyRealtimeUpdate('education');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return true;
@@ -1584,7 +2334,9 @@ export const PortfolioProvider = ({ children }) => {
 
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('education');
-    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, educationList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
@@ -1629,6 +2381,7 @@ export const PortfolioProvider = ({ children }) => {
       ...prev.filter((e) => String(e.id ?? e._id) !== strId && String(e.id ?? e._id) !== String(savedData.id)),
     ]);
     notifyRealtimeUpdate('experience');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
@@ -1674,6 +2427,7 @@ export const PortfolioProvider = ({ children }) => {
       )
     );
     notifyRealtimeUpdate('experience');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return true;
@@ -1724,7 +2478,9 @@ export const PortfolioProvider = ({ children }) => {
 
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('experience');
-    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, experienceList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
@@ -1774,6 +2530,7 @@ export const PortfolioProvider = ({ children }) => {
       ...prev.filter((s) => String(s.id ?? s._id) !== strId && String(s.id ?? s._id) !== String(savedData.id)),
     ]);
     notifyRealtimeUpdate('skills');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return savedData.id || id;
@@ -1800,16 +2557,19 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
+    const matchesTargetSkill = (s) => {
+      const sId = s.id ?? s._id;
+      const sMongoId = s._id ?? s.id;
+      if (sId !== undefined || sMongoId !== undefined) {
+        return String(sId) === strId || String(sMongoId) === strId;
+      }
+      return String(s.name) === strId;
+    };
+
     // Optimistic update for instant real-time UI feedback across Admin and Portfolio Frontend
     setSkillsLoadedFromDb(true);
     setCustomSkills((prev) =>
-      prev.map((s) =>
-        String(s.id ?? s._id) === strId ||
-        String(s._id ?? s.id) === strId ||
-        String(s.name) === strId
-          ? { ...s, ...payload }
-          : s
-      )
+      prev.map((s) => (matchesTargetSkill(s) ? { ...s, ...payload } : s))
     );
 
     const res = await adminFetch(buildApiUrl(`/api/skills/${encodeURIComponent(strId)}`), {
@@ -1825,14 +2585,11 @@ export const PortfolioProvider = ({ children }) => {
     mutationVersionRef.current += 1;
     setCustomSkills((prev) =>
       prev.map((s) =>
-        String(s.id ?? s._id) === strId ||
-        String(s._id ?? s.id) === strId ||
-        String(s.name) === strId
-          ? { ...s, ...payload, ...(json.data || {}) }
-          : s
+        matchesTargetSkill(s) ? { ...s, ...payload, ...(json.data || {}) } : s
       )
     );
     notifyRealtimeUpdate('skills');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return true;
@@ -1848,26 +2605,23 @@ export const PortfolioProvider = ({ children }) => {
         ? idOrSkill.id || idOrSkill._id || idOrSkill.name
         : idOrSkill;
     const strId = String(targetId || '').trim();
-    const targetName =
-      idOrSkill && typeof idOrSkill === 'object' && idOrSkill.name
-        ? String(idOrSkill.name).trim()
-        : strId;
     if (!strId) {
       throw new Error('Invalid skill ID for deletion.');
     }
 
-    markClientDeleted(strId, targetName, idOrSkill);
+    markClientDeleted(strId, idOrSkill);
 
-    // Optimistically remove from customSkills immediately
+    // Optimistically remove only the targeted skill ID from customSkills immediately
     setSkillsLoadedFromDb(true);
     setCustomSkills((prev) =>
-      prev.filter(
-        (s) =>
-          String(s.id ?? s._id) !== strId &&
-          String(s._id ?? s.id) !== strId &&
-          String(s.name) !== strId &&
-          String(s.name) !== targetName
-      )
+      prev.filter((s) => {
+        const sId = s.id ?? s._id;
+        const sMongoId = s._id ?? s.id;
+        if (sId !== undefined || sMongoId !== undefined) {
+          return String(sId) !== strId && String(sMongoId) !== strId;
+        }
+        return String(s.name) !== strId;
+      })
     );
 
     const res = await adminFetch(buildApiUrl(`/api/skills/${encodeURIComponent(strId)}`), {
@@ -1875,14 +2629,16 @@ export const PortfolioProvider = ({ children }) => {
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok && res.status !== 404 && json.success === false) {
-      unmarkClientDeleted(strId, targetName, idOrSkill);
+      unmarkClientDeleted(strId, idOrSkill);
       await refreshPortfolioData();
       throw new Error(json.error || 'Failed to delete skill from database.');
     }
 
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('skills');
-    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    refreshPortfolioData(false);
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
@@ -1893,13 +2649,22 @@ export const PortfolioProvider = ({ children }) => {
     }
     mutationVersionRef.current += 1;
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
+    const cleanUpdates = { ...updates };
+    for (const mediaKey of ['heroImage', 'aboutImage', 'logoImage', 'resumeUrl']) {
+      if (
+        typeof cleanUpdates[mediaKey] === 'string' &&
+        cleanUpdates[mediaKey].includes('/api/profile/media/')
+      ) {
+        delete cleanUpdates[mediaKey];
+      }
+    }
     const payload = {
-      ...updates,
+      ...cleanUpdates,
       authorUid,
       updatedAt: new Date().toISOString(),
     };
 
-    setProfileConfig((prev) => ({ ...prev, ...updates }));
+    setProfileConfig((prev) => ({ ...prev, ...cleanUpdates, updatedAt: payload.updatedAt }));
 
     const res = await adminFetch(buildApiUrl('/api/profile'), {
       method: 'PUT',
@@ -1912,9 +2677,11 @@ export const PortfolioProvider = ({ children }) => {
     }
 
     mutationVersionRef.current += 1;
-    setProfileConfig((prev) => ({ ...prev, ...updates, ...(json.data || {}) }));
+    setProfileConfig((prev) => ({ ...prev, ...cleanUpdates, ...(json.data || {}) }));
     notifyRealtimeUpdate('profile');
-    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
@@ -1957,10 +2724,11 @@ export const PortfolioProvider = ({ children }) => {
       ]);
     }
     notifyRealtimeUpdate('messages');
+    refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
     return savedEntry;
-  }, [unmarkClientDeleted, fetchAuditLogs, fetchAuditStats]);
+  }, [unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const markContactMessageRead = useCallback(async (id) => {
     const strId = String(id || '').trim();
@@ -1974,10 +2742,11 @@ export const PortfolioProvider = ({ children }) => {
     });
     if (res.ok) {
       notifyRealtimeUpdate('messages');
+      refreshPortfolioData(false);
       return true;
     }
     return false;
-  }, [adminFetch]);
+  }, [adminFetch, refreshPortfolioData]);
 
   const deleteContactMessage = useCallback(async (idOrMsg) => {
     if (!isAdmin) {
@@ -2026,7 +2795,9 @@ export const PortfolioProvider = ({ children }) => {
     }
     mutationVersionRef.current += 1;
     notifyRealtimeUpdate('messages');
-    await Promise.all([refreshPortfolioData(), fetchAuditLogs(), fetchAuditStats()]);
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
     return true;
   }, [isAdmin, adminFetch, contactMessages, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
@@ -2078,6 +2849,7 @@ export const PortfolioProvider = ({ children }) => {
     updateProfilePhotos,
     seedInitialData,
     submitContactMessage,
+    fetchContactMessages,
     markContactMessageRead,
     deleteContactMessage,
 

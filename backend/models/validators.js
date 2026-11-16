@@ -141,10 +141,33 @@ export const validateCertification = (data = {}, isUpdate = false) => {
   const rawPreview = data.preview ? String(data.preview).trim() : '';
   const rawLink = data.link || data.credentialUrl || data.verifyUrl || '';
 
+  const isPdfVal = (v) =>
+    typeof v === 'string' &&
+    (v.startsWith('data:application/pdf') ||
+      v.toLowerCase().endsWith('.pdf') ||
+      v.toLowerCase().includes('.pdf?'));
+
+  const hasPdf = isPdfVal(rawFile) || isPdfVal(rawImage) || isPdfVal(rawPreview);
+  const pdfDoc = isPdfVal(rawFile)
+    ? rawFile
+    : isPdfVal(rawImage)
+    ? rawImage
+    : isPdfVal(rawPreview)
+    ? rawPreview
+    : '';
+  const imgDoc = !isPdfVal(rawPreview) && rawPreview
+    ? rawPreview
+    : !isPdfVal(rawImage) && rawImage
+    ? rawImage
+    : !isPdfVal(rawFile) && rawFile
+    ? rawFile
+    : '';
+
   const primaryDoc =
-    rawImage || rawFile || rawPreview || '/certificates/previews/ibm-web-dev.png';
-  const fileDoc = rawFile || rawImage || rawLink || primaryDoc;
-  const previewDoc = rawPreview || rawImage || primaryDoc;
+    imgDoc || pdfDoc || '/certificates/previews/ibm-web-dev.png';
+  const fileDoc = pdfDoc || rawFile || imgDoc || rawLink || primaryDoc;
+  const previewDoc = imgDoc || (hasPdf ? '' : primaryDoc);
+  const imageDoc = imgDoc || (hasPdf ? '' : primaryDoc);
   const linkDoc = rawLink ? sanitizeUrl(String(rawLink), fileDoc) : fileDoc;
 
   const sanitized = {
@@ -154,9 +177,9 @@ export const validateCertification = (data = {}, isUpdate = false) => {
     category,
     categoryLabel: sanitizeString(data.categoryLabel || 'Professional Certification', 120),
     credentialId: sanitizeString(data.credentialId || '', 150),
-    image: sanitizeUrl(primaryDoc, '/certificates/previews/ibm-web-dev.png'),
+    image: imageDoc ? sanitizeUrl(imageDoc, '') : '',
     file: sanitizeUrl(fileDoc, '/certificates/previews/ibm-web-dev.png'),
-    preview: sanitizeUrl(previewDoc, '/certificates/previews/ibm-web-dev.png'),
+    preview: previewDoc ? sanitizeUrl(previewDoc, '') : '',
     link: linkDoc,
     credentialUrl: linkDoc,
     verifyUrl: linkDoc,

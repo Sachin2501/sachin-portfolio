@@ -1,6 +1,10 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Upload, FileText, Image as ImageIcon, X, Check, RefreshCw, Download, Eye } from 'lucide-react';
-import { PdfCanvasViewer, base64ToUint8Array } from '../../portfolio-frontend/components/PdfCanvasViewer.jsx';
+import {
+  PdfCanvasViewer,
+  base64ToUint8Array,
+  renderPdfFirstPageToPng,
+} from '../../portfolio-frontend/components/PdfCanvasViewer.jsx';
 
 const convertDataUrlToBlobUrl = (dataUrl) => {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
@@ -149,12 +153,32 @@ export const FileUploadZone = ({
       setIsReading(false);
       if (isPdfFile) {
         setShowInlinePdfPreview(true);
+        if (onChange) {
+          onChange(base64Result, {
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/pdf',
+          });
+        }
+        renderPdfFirstPageToPng(base64Result)
+          .then((previewDataUrl) => {
+            if (previewDataUrl && onChange) {
+              onChange(base64Result, {
+                name: file.name,
+                size: file.size,
+                type: file.type || 'application/pdf',
+                previewDataUrl,
+              });
+            }
+          })
+          .catch(() => {});
+        return;
       }
       if (onChange) {
         onChange(base64Result, {
           name: file.name,
           size: file.size,
-          type: file.type || (isPdfFile ? 'application/pdf' : 'image/png'),
+          type: file.type || 'image/png',
         });
       }
     };

@@ -154,36 +154,12 @@ export const Contact = () => {
         message: formData.message.trim(),
       };
 
-      // 1. Send to Formspree using FormData (avoids CORS preflight blocks in browsers/iframes)
-      let clientEmailSent = false;
-      try {
-        const formPayload = new FormData();
-        formPayload.append('name', payload.name);
-        formPayload.append('email', payload.email);
-        formPayload.append('subject', `[${inquiryType.toUpperCase()}] ${effectiveSubject} - from ${payload.name}`);
-        formPayload.append('inquiryType', inquiryType);
-        formPayload.append('message', payload.message);
-        formPayload.append('_replyto', payload.email);
-        formPayload.append('_subject', `[${inquiryType.toUpperCase()}] ${effectiveSubject} - from ${payload.name}`);
-
-        const formspreeRes = await fetch('https://formspree.io/f/xrbykkkb', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-          },
-          body: formPayload,
-        });
-        clientEmailSent = formspreeRes.ok;
-      } catch {
-        clientEmailSent = false;
-      }
-
-      // 2. Save to Express + MongoDB Backend API (also sends email from server if clientEmailSent is false)
+      // 1. Save immediately to Express + MongoDB Backend API (which also forwards email in background)
       let dbSaved = false;
       let dbError = null;
       try {
         if (submitContactMessage) {
-          await submitContactMessage({ ...payload, emailAlreadySent: clientEmailSent });
+          await submitContactMessage({ ...payload, emailAlreadySent: false });
           dbSaved = true;
         } else {
           const backendRes = await fetch(buildApiUrl('/api/contact'), {
@@ -191,7 +167,7 @@ export const Contact = () => {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ ...payload, emailAlreadySent: clientEmailSent }),
+            body: JSON.stringify({ ...payload, emailAlreadySent: false }),
           });
           const resJson = await backendRes.json().catch(() => ({}));
           if (!backendRes.ok || resJson.success === false) {
@@ -206,6 +182,32 @@ export const Contact = () => {
         }
       } catch (err) {
         dbError = err;
+      }
+
+      // 2. Fallback to direct Formspree only if backend was unreachable
+      let clientEmailSent = false;
+      if (!dbSaved) {
+        try {
+          const formPayload = new FormData();
+          formPayload.append('name', payload.name);
+          formPayload.append('email', payload.email);
+          formPayload.append('subject', `[${inquiryType.toUpperCase()}] ${effectiveSubject} - from ${payload.name}`);
+          formPayload.append('inquiryType', inquiryType);
+          formPayload.append('message', payload.message);
+          formPayload.append('_replyto', payload.email);
+          formPayload.append('_subject', `[${inquiryType.toUpperCase()}] ${effectiveSubject} - from ${payload.name}`);
+
+          const formspreeRes = await fetch('https://formspree.io/f/xrbykkkb', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+            },
+            body: formPayload,
+          });
+          clientEmailSent = formspreeRes.ok;
+        } catch {
+          clientEmailSent = false;
+        }
       }
 
       if (!dbSaved && !clientEmailSent) {
