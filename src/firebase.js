@@ -1,7 +1,24 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore, setLogLevel } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+
+const configModules = import.meta.glob('../firebase-applet-config.json', { eager: true });
+const rawLocalConfig =
+  configModules['../firebase-applet-config.json']?.default ||
+  configModules['../firebase-applet-config.json'] ||
+  null;
+
+const firebaseConfig = rawLocalConfig || {
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'sonic-stratum-414518',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:403602393055:web:8534a4b136953b883fe66a',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCHw_OmQtiUtAYFxkTc9V8GpJWhqElN5TQ',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'sonic-stratum-414518.firebaseapp.com',
+  firestoreDatabaseId:
+    import.meta.env.VITE_FIREBASE_DATABASE_ID ||
+    'ai-studio-portfoliowebsite-3a2b7684-f1bb-4341-b355-6cedf3061e32',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'sonic-stratum-414518.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '403602393055',
+};
 
 // Silence internal @firebase/firestore WebChannel timeout logs since data is served by the Node.js + MongoDB backend
 try {
