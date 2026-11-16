@@ -61,8 +61,20 @@ portfolioRouter.get('/realtime/stream', (req, res) => {
     }
   }, 15000);
 
+  // On Vercel Serverless, close the stream cleanly before function timeout; EventSource automatically reconnects
+  const vercelTimeout = process.env.VERCEL
+    ? setTimeout(() => {
+        clearInterval(heartbeat);
+        realtimeBus.off('change', onDbChange);
+        try {
+          res.end();
+        } catch {}
+      }, 8000)
+    : null;
+
   req.on('close', () => {
     clearInterval(heartbeat);
+    if (vercelTimeout) clearTimeout(vercelTimeout);
     realtimeBus.off('change', onDbChange);
   });
 });

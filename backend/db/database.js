@@ -27,21 +27,32 @@ export const defaultSkillsList = (initialSkillCategories || []).flatMap((cat) =>
     level: s.level || 'Advanced',
     icon: s.icon || 'fas fa-code',
     highlight: !!s.highlight,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
   }))
 );
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_DIR = path.resolve(__dirname, '../../data-storage');
+const LOCAL_DATA_DIR = path.resolve(__dirname, '../../data-storage');
+let DATA_DIR = LOCAL_DATA_DIR;
 
 try {
+  if (process.env.VERCEL) {
+    DATA_DIR = '/tmp/data-storage';
+  }
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 } catch {
-  // Read-only filesystem in serverless environments (e.g., Vercel); uses memoryCache + MongoDB Atlas
+  try {
+    DATA_DIR = '/tmp/data-storage';
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch {
+    // Uses memoryCache + MongoDB Atlas
+  }
 }
 
 const DELETED_REGISTRY_PATH = path.join(DATA_DIR, 'deleted_ids.json');
@@ -490,11 +501,10 @@ export class MongoCollection {
           }
         }
 
-        // Preserve any very recently created local docs not yet visible in remoteById
-        for (const [lKey, lDoc] of localById.entries()) {
-          if (!remoteById.has(lKey) && !this.isDocDeleted(lDoc, deletedSet)) {
-            const lTime = lDoc.updatedAt ? new Date(lDoc.updatedAt).getTime() : 0;
-            if (lTime > Date.now() - 60000) {
+        // Preserve any local doc written on THIS instance within the last 5s that hasn't propagated yet
+        if (this._lastLocalWriteAt && Date.now() - this._lastLocalWriteAt < 5000) {
+          for (const [lKey, lDoc] of localById.entries()) {
+            if (!remoteById.has(lKey) && !this.isDocDeleted(lDoc, deletedSet)) {
               remoteById.set(lKey, lDoc);
               const { _id: _omit, ...safeLocal } = lDoc;
               col.updateOne({ _id: String(lDoc._id || lKey) }, { $set: safeLocal }, { upsert: true }).catch(() => {});
@@ -561,7 +571,7 @@ export class MongoCollection {
     if (this._lastLocalWriteAt && now - this._lastLocalWriteAt < 4500) {
       return;
     }
-    if (!force && this._lastAtlasPull && now - this._lastAtlasPull < 3500) {
+    if (!force && this._lastAtlasPull && now - this._lastAtlasPull < 2000) {
       return;
     }
 
@@ -624,11 +634,10 @@ export class MongoCollection {
             }
           }
 
-          // Preserve any recently created/updated local item not yet reflected in Atlas
-          for (const [lKey, lDoc] of localById.entries()) {
-            if (!remoteById.has(lKey) && !this.isDocDeleted(lDoc, deletedSet)) {
-              const lTime = lDoc.updatedAt ? new Date(lDoc.updatedAt).getTime() : 0;
-              if (lTime > Date.now() - 60000) {
+          // Preserve any local item written on THIS instance within the last 5s that hasn't propagated to Atlas yet
+          if (this._lastLocalWriteAt && Date.now() - this._lastLocalWriteAt < 5000) {
+            for (const [lKey, lDoc] of localById.entries()) {
+              if (!remoteById.has(lKey) && !this.isDocDeleted(lDoc, deletedSet)) {
                 remoteById.set(lKey, lDoc);
                 if (this.realCollection) {
                   const { _id: _omit, ...safeLocal } = lDoc;
@@ -719,8 +728,8 @@ export class MongoCollection {
             deduplicateDocMedia({
               ...item,
               _id: item._id || item.id || `doc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-              createdAt: item.createdAt || new Date().toISOString(),
-              updatedAt: item.updatedAt || new Date().toISOString(),
+              createdAt: item.createdAt || '2025-01-01T00:00:00.000Z',
+              updatedAt: item.updatedAt || '2025-01-01T00:00:00.000Z',
             })
           )
           .filter((item) => !this.isDocDeleted(item, deletedSet));

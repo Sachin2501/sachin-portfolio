@@ -4,16 +4,22 @@ import { PortfolioApp } from './portfolio-frontend/PortfolioApp.jsx';
 import { AdminApp } from './admin-frontend/AdminApp.jsx';
 
 // Deployment Mode Configuration:
-// - 'portfolio': Locks deployment exclusively to the public Portfolio Frontend (for Portfolio Vercel project)
-// - 'admin': Locks deployment exclusively to the Admin Control Panel (for Admin Vercel project)
+// - 'portfolio' / 'frontend': Locks deployment exclusively to the public Portfolio Frontend (for Portfolio Vercel project)
+// - 'admin' / 'admin-frontend': Locks deployment exclusively to the Admin Control Panel (for Admin Vercel project)
 // - 'both' (default): Unified mode supporting both views via /admin, #admin, or Ctrl+Shift+A
-const APP_MODE = (import.meta.env.VITE_APP_MODE || 'both').toLowerCase().trim();
+const RAW_APP_MODE = (import.meta.env.VITE_APP_MODE || 'both').toLowerCase().trim();
+const IS_ADMIN_ONLY = RAW_APP_MODE === 'admin' || RAW_APP_MODE === 'admin-frontend' || RAW_APP_MODE === 'admin-only';
+const IS_PORTFOLIO_ONLY =
+  RAW_APP_MODE === 'portfolio' ||
+  RAW_APP_MODE === 'frontend' ||
+  RAW_APP_MODE === 'portfolio-frontend' ||
+  RAW_APP_MODE === 'portfolio-only';
 const PUBLIC_PORTFOLIO_URL = (import.meta.env.VITE_PORTFOLIO_PUBLIC_URL || '').trim();
 
 export const App = () => {
   const [currentView, setCurrentView] = useState(() => {
-    if (APP_MODE === 'admin') return 'admin';
-    if (APP_MODE === 'portfolio') return 'frontend';
+    if (IS_ADMIN_ONLY) return 'admin';
+    if (IS_PORTFOLIO_ONLY) return 'frontend';
 
     if (typeof window !== 'undefined') {
       const pathname = window.location.pathname.toLowerCase();
@@ -28,7 +34,7 @@ export const App = () => {
 
   // Listen to hash changes when running in unified ('both') mode
   useEffect(() => {
-    if (APP_MODE === 'admin' || APP_MODE === 'portfolio') return undefined;
+    if (IS_ADMIN_ONLY || IS_PORTFOLIO_ONLY) return undefined;
 
     const handleHashChange = () => {
       const hash = window.location.hash.toLowerCase();
@@ -47,7 +53,7 @@ export const App = () => {
 
   // Keyboard shortcut Ctrl+Shift+A or Alt+A to toggle between Frontend and Admin UI (only in 'both' mode)
   useEffect(() => {
-    if (APP_MODE === 'admin' || APP_MODE === 'portfolio') return undefined;
+    if (IS_ADMIN_ONLY || IS_PORTFOLIO_ONLY) return undefined;
 
     const handleKeyDown = (e) => {
       if (
@@ -68,7 +74,7 @@ export const App = () => {
 
   const handleNavigateToFrontend = useCallback(() => {
     // If deployed as a standalone Admin project and VITE_PORTFOLIO_PUBLIC_URL is set, navigate there
-    if (APP_MODE === 'admin' && PUBLIC_PORTFOLIO_URL) {
+    if (IS_ADMIN_ONLY && PUBLIC_PORTFOLIO_URL) {
       window.location.href = PUBLIC_PORTFOLIO_URL;
       return;
     }
