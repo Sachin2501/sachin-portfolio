@@ -84,6 +84,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     fetchContactMessages: ctxFetchContactMessages,
     markContactMessageRead,
     deleteContactMessage,
+    clearContactMessages,
     refreshPortfolioData,
     auditLogs,
     auditStats,
@@ -257,7 +258,10 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
 
   // Periodic ping to /api/portfolio?light=1 + /api/stats + /api/health for live latency & uptime
   const fetchBackendData = useCallback(async () => {
-    const fetchOpts = { cache: 'no-store' };
+    const fetchOpts = {
+      cache: 'no-store',
+      headers: getDeleteHeaders(),
+    };
     const pingStart = performance.now();
     try {
       const ts = Date.now();
@@ -287,9 +291,6 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       }
       if (healthData) {
         setBackendHealth(healthData);
-      }
-      if (Array.isArray(pData?.data?.messages) && pData.data.messages.length > 0) {
-        setContactMessages(pData.data.messages);
       }
 
       const portfolioOk = Boolean(portfolioRes && portfolioRes.ok && pData?.success !== false);
@@ -1259,6 +1260,30 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     } catch (err) {
       fetchContactMessages();
       showToast('Failed to delete message: ' + (err?.message || ''), true);
+    }
+  };
+
+  const handleClearAllMessages = async () => {
+    if (!requireAdminAuth('clear all inquiry messages')) return;
+    try {
+      setContactMessages([]);
+      if (clearContactMessages) {
+        await clearContactMessages();
+      } else {
+        const res = await fetch(buildApiUrl('/api/contact/messages/clear'), {
+          method: 'POST',
+          headers: getDeleteHeaders(),
+        });
+        if (!res.ok) {
+          throw new Error('Failed to clear inquiries from database.');
+        }
+      }
+      await refreshPortfolioData();
+      fetchBackendData();
+      showToast('All inquiries cleared permanently from MongoDB!');
+    } catch (err) {
+      fetchContactMessages();
+      showToast('Failed to clear messages: ' + (err?.message || ''), true);
     }
   };
 
@@ -3132,15 +3157,39 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                     Inquiries received from portfolio visitors and stored in MongoDB `messages` collection.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={fetchContactMessages}
-                  disabled={isLoadingMessages}
-                >
-                  <RefreshCw size={14} className={isLoadingMessages ? 'spin' : ''} />
-                  <span>Refresh Inbox</span>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  {contactMessages.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn-delete-card"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        padding: '0.5rem 0.9rem',
+                        width: 'auto',
+                        height: 'auto',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                      }}
+                      onClick={handleClearAllMessages}
+                      disabled={isLoadingMessages}
+                      title="Delete all inquiries from MongoDB"
+                    >
+                      <Trash2 size={14} />
+                      <span>Clear All ({contactMessages.length})</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={fetchContactMessages}
+                    disabled={isLoadingMessages}
+                  >
+                    <RefreshCw size={14} className={isLoadingMessages ? 'spin' : ''} />
+                    <span>Refresh Inbox</span>
+                  </button>
+                </div>
               </div>
 
               {contactMessages.length > 0 ? (

@@ -367,6 +367,31 @@ export class MongoCollection {
     return new Set(arr.map((x) => String(x)));
   }
 
+  getClearedAt(subCollection = null) {
+    const reg = loadDeletedRegistry();
+    let clearedAt = Number(reg[`${this.collectionName}__clearedAt`] || 0) || 0;
+    if (this.collectionName === 'audit_logs' && subCollection) {
+      const subKey = `audit_logs__clearedAt__${String(subCollection).toLowerCase()}`;
+      const subTs = Number(reg[subKey] || 0) || 0;
+      if (subTs > clearedAt) clearedAt = subTs;
+      if (String(subCollection).toLowerCase() === 'messages') {
+        const msgCleared = Number(reg['messages__clearedAt'] || 0) || 0;
+        if (msgCleared > clearedAt) clearedAt = msgCleared;
+      }
+    }
+    return clearedAt;
+  }
+
+  markClearedAt(subCollection = null, ts = Date.now()) {
+    const reg = loadDeletedRegistry();
+    if (subCollection) {
+      reg[`${this.collectionName}__clearedAt__${String(subCollection).toLowerCase()}`] = ts;
+    } else {
+      reg[`${this.collectionName}__clearedAt`] = ts;
+    }
+    saveDeletedRegistry(reg);
+  }
+
   markIdsDeleted(ids = []) {
     const clean = ids.filter(Boolean).map((x) => String(x).trim()).filter(Boolean);
     if (clean.length === 0) return;
@@ -388,10 +413,31 @@ export class MongoCollection {
 
   isDocDeleted(doc, deletedSet = null) {
     if (!doc) return false;
+    if (doc.deleted === true || doc.isDeleted === true) return true;
     const set = deletedSet || this.getDeletedSet();
-    if (set.size === 0) return false;
     if (doc._id !== undefined && set.has(String(doc._id))) return true;
     if (doc.id !== undefined && set.has(String(doc.id))) return true;
+
+    if (this.collectionName === 'audit_logs') {
+      if (doc.targetId !== undefined && set.has(String(doc.targetId))) return true;
+      if (String(doc.collectionName || '').toLowerCase() === 'messages' && doc.targetId !== undefined) {
+        const reg = loadDeletedRegistry();
+        const msgDeleted = Array.isArray(reg.messages) ? reg.messages : [];
+        if (msgDeleted.includes(String(doc.targetId))) return true;
+      }
+    }
+
+    if (this.collectionName === 'messages' || this.collectionName === 'audit_logs') {
+      const clearedAt = this.getClearedAt(doc.collectionName);
+      if (clearedAt > 0) {
+        const docTime =
+          new Date(doc.timestamp || doc.createdAt || doc.updatedAt || 0).getTime() || 0;
+        if (docTime > 0 && docTime <= clearedAt) {
+          return true;
+        }
+      }
+    }
+
     return false;
   }
 
@@ -537,8 +583,13 @@ export class MongoCollection {
         this.memoryCache = finalMergedList;
         this._lastAtlasPull = Date.now();
         this.saveData();
-      } else if (this.memoryCache && this.memoryCache.length > 0) {
-        // Seed initial data into empty MongoDB Atlas collection
+      } else if (
+        this.memoryCache &&
+        this.memoryCache.length > 0 &&
+        this.collectionName !== 'audit_logs' &&
+        this.collectionName !== 'messages'
+      ) {
+        // Seed initial portfolio data into empty MongoDB Atlas collection (never auto-reseed audit_logs or messages)
         this.memoryCache = this.memoryCache.filter((item) => !this.isDocDeleted(item, deletedSet));
         this.saveData();
         for (const item of this.memoryCache) {
@@ -554,6 +605,11 @@ export class MongoCollection {
         }
         this._lastAtlasPull = Date.now();
       } else {
+        // Remote MongoDB Atlas collection is empty for audit_logs or messages: clear local cache to match Atlas
+        if (this.collectionName === 'audit_logs' || this.collectionName === 'messages') {
+          this.memoryCache = [];
+          this.saveData();
+        }
         this._lastAtlasPull = Date.now();
       }
     } catch (err) {
@@ -1155,6 +1211,14 @@ export class MongoCollection {
       if (m._id !== undefined) idsToTombstone.push(String(m._id));
       if (m.id !== undefined) idsToTombstone.push(String(m.id));
     }
+    if (filter && filter.targetId) {
+      idsToTombstone.push(String(filter.targetId));
+    }
+    if (isClearAll) {
+      this.markClearedAt(null, Date.now());
+    } else if (this.collectionName === 'audit_logs' && filter && filter.collectionName) {
+      this.markClearedAt(String(filter.collectionName), Date.now());
+    }
     this.markIdsDeleted(idsToTombstone);
     this._lastAtlasPull = Date.now();
     this.saveData();
@@ -1167,9 +1231,12 @@ export class MongoCollection {
           if (isClearAll) {
             await col.deleteMany({});
           } else if (idsToTombstone.length > 0) {
-            await col.deleteMany({
-              $or: [{ _id: { $in: idsToTombstone } }, { id: { $in: idsToTombstone } }, filter],
-            });
+            const mongoFilter = buildMongoOrFilter(idsToTombstone, filter);
+            if (mongoFilter) {
+              await col.deleteMany(mongoFilter);
+            } else {
+              await col.deleteMany(filter);
+            }
           } else {
             await col.deleteMany(filter);
           }
@@ -1179,7 +1246,7 @@ export class MongoCollection {
           this._lastAtlasPull = Date.now();
         }
       });
-      await withTimeout(syncTask, 4000).catch(() => {});
+      await withTimeout(syncTask, 5000).catch(() => {});
     }
 
     this.emitChange('CLEAR');
@@ -1231,153 +1298,8 @@ export class MongoDatabase {
     this.education = new MongoCollection('education', initialEducation, this);
     this.experience = new MongoCollection('experience', initialExperiences, this);
     this.skills = new MongoCollection('skills', defaultSkillsList, this);
-    const defaultAuditLogs = [
-      {
-        _id: 'audit_init_1',
-        id: 'audit_init_1',
-        timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
-        action: 'UPDATE',
-        collectionName: 'projects',
-        targetId: '1',
-        targetTitle: 'AI Brain Tumor Segmentation & Diagnostic System',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        diff: {
-          before: { featured: true, category: 'Computer Vision & AI/ML' },
-          after: {
-            featured: true,
-            category: 'Computer Vision & AI/ML',
-            seo: { metaTitle: 'AI Brain Tumor Segmentation | Sachin Kumar' },
-          },
-          modifiedFields: ['seo', 'updatedAt'],
-        },
-        metadata: {
-          ipAddress: '127.0.0.1',
-          userAgent: 'Admin Control Panel REST Sync',
-          method: 'PUT',
-          endpoint: '/api/projects/1',
-        },
-      },
-      {
-        _id: 'audit_init_2',
-        id: 'audit_init_2',
-        timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
-        action: 'CREATE',
-        collectionName: 'experience',
-        targetId: 'exp-1',
-        targetTitle: 'AI & Machine Learning Intern at IBM SkillsBuild (AICTE)',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        diff: {
-          before: null,
-          after: {
-            role: 'AI & Machine Learning Intern',
-            company: 'IBM SkillsBuild (AICTE)',
-            category: 'ai',
-          },
-          modifiedFields: [],
-        },
-        metadata: {
-          ipAddress: '127.0.0.1',
-          userAgent: 'Admin Control Panel REST Sync',
-          method: 'POST',
-          endpoint: '/api/experience',
-        },
-      },
-      {
-        _id: 'audit_init_3',
-        id: 'audit_init_3',
-        timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
-        action: 'CREATE',
-        collectionName: 'certifications',
-        targetId: 'cert-1',
-        targetTitle: 'Oracle Cloud Infrastructure AI Foundations Associate (Oracle)',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        diff: {
-          before: null,
-          after: {
-            title: 'Oracle Cloud Infrastructure AI Foundations Associate',
-            issuer: 'Oracle',
-            category: 'ai',
-          },
-          modifiedFields: [],
-        },
-        metadata: {
-          ipAddress: '127.0.0.1',
-          userAgent: 'Admin Control Panel REST Sync',
-          method: 'POST',
-          endpoint: '/api/certifications',
-        },
-      },
-      {
-        _id: 'audit_init_4',
-        id: 'audit_init_4',
-        timestamp: new Date(Date.now() - 3600000 * 20).toISOString(),
-        action: 'CREATE',
-        collectionName: 'skills',
-        targetId: 'skill_ai_ml_0',
-        targetTitle: 'PyTorch & Deep Learning (AI, Machine Learning & Vision)',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        diff: {
-          before: null,
-          after: {
-            name: 'PyTorch & Deep Learning',
-            domainId: 'ai-ml',
-            level: 'Expert',
-            highlight: true,
-          },
-          modifiedFields: [],
-        },
-        metadata: {
-          ipAddress: '127.0.0.1',
-          userAgent: 'Admin Control Panel REST Sync',
-          method: 'POST',
-          endpoint: '/api/skills',
-        },
-      },
-    ];
-
-    this.auditLogs = new MongoCollection('audit_logs', defaultAuditLogs, this);
-    this.messages = new MongoCollection('messages', [
-      {
-        _id: 'msg_1',
-        id: 'msg_1',
-        name: 'Emily Davis',
-        email: 'emily.davis@techventures.io',
-        subject: 'Senior AI Engineer Opportunity',
-        message: 'Hi Sachin, we were deeply impressed by your ML and Full-Stack background. Would love to connect for a quick intro call.',
-        timestamp: new Date(Date.now() - 86400000 * 2).toISOString(),
-        status: 'read',
-      },
-      {
-        _id: 'msg_2',
-        id: 'msg_2',
-        name: 'Rahul Sharma',
-        email: 'rahul.s@cloudscale.dev',
-        subject: 'Consulting on Distributed Systems',
-        message: 'Hey Sachin! Loved your projects on GitHub. Are you available for contract or consulting work in Q2?',
-        timestamp: new Date(Date.now() - 86400000).toISOString(),
-        status: 'unread',
-      },
-    ], this);
+    this.auditLogs = new MongoCollection('audit_logs', [], this);
+    this.messages = new MongoCollection('messages', [], this);
     this.profile = new MongoCollection('profile', [
       {
         _id: 'config',

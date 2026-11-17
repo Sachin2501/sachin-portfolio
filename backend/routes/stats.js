@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/database.js';
+import { getAuthenticatedAdmin, extractClientDeletedSet } from '../middleware/auth.js';
 
 export const statsRouter = Router();
 
@@ -26,25 +27,41 @@ statsRouter.get('/health', async (_req, res) => {
 });
 
 // Comprehensive stats & metrics for Admin Control Panel
-statsRouter.get('/stats', async (_req, res) => {
+statsRouter.get('/stats', async (req, res) => {
   try {
+    const adminUser = getAuthenticatedAdmin(req);
+    const clientDeletedSet = extractClientDeletedSet(req);
+    const msgDeletedSet = db.messages.getDeletedSet();
+
     const [
       projectsCount,
       certsCount,
       educationCount,
       experienceCount,
       skillsCount,
-      messagesCount,
-      unreadMessagesCount,
+      rawMessages,
     ] = await Promise.all([
       db.projects.countDocuments(),
       db.certifications.countDocuments(),
       db.education.countDocuments(),
       db.experience.countDocuments(),
       db.skills.countDocuments(),
-      db.messages.countDocuments(),
-      db.messages.countDocuments({ status: 'unread' }),
+      adminUser ? db.messages.find({}) : Promise.resolve([]),
     ]);
+
+    const activeMessages = adminUser && Array.isArray(rawMessages)
+      ? rawMessages.filter((m) => {
+          if (!m) return false;
+          if (db.messages.isDocDeleted(m, msgDeletedSet)) return false;
+          const mId = String(m.id ?? m._id ?? '');
+          const mMongoId = String(m._id ?? m.id ?? '');
+          if (clientDeletedSet.has(mId) || clientDeletedSet.has(mMongoId)) return false;
+          return true;
+        })
+      : [];
+
+    const messagesCount = activeMessages.length;
+    const unreadMessagesCount = activeMessages.filter((m) => m.status === 'unread').length;
 
     const statsDoc = await db.analytics.findOne({ id: 'stats' });
     const pageViews = statsDoc?.pageViews || 1540;

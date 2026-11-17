@@ -6,6 +6,7 @@ export const ProjectModel = {
   create: (doc) => db.projects.create(doc),
   findByIdAndUpdate: (id, updates) => db.projects.findByIdAndUpdate(id, updates),
   findByIdAndDelete: (id) => db.projects.findByIdAndDelete(id),
+  deleteMany: (query = {}) => db.projects.deleteMany(query),
   countDocuments: (query = {}) => db.projects.countDocuments(query),
 };
 
@@ -15,6 +16,7 @@ export const CertificationModel = {
   create: (doc) => db.certifications.create(doc),
   findByIdAndUpdate: (id, updates) => db.certifications.findByIdAndUpdate(id, updates),
   findByIdAndDelete: (id) => db.certifications.findByIdAndDelete(id),
+  deleteMany: (query = {}) => db.certifications.deleteMany(query),
   countDocuments: (query = {}) => db.certifications.countDocuments(query),
 };
 
@@ -24,6 +26,7 @@ export const EducationModel = {
   create: (doc) => db.education.create(doc),
   findByIdAndUpdate: (id, updates) => db.education.findByIdAndUpdate(id, updates),
   findByIdAndDelete: (id) => db.education.findByIdAndDelete(id),
+  deleteMany: (query = {}) => db.education.deleteMany(query),
   countDocuments: (query = {}) => db.education.countDocuments(query),
 };
 
@@ -33,6 +36,7 @@ export const ExperienceModel = {
   create: (doc) => db.experience.create(doc),
   findByIdAndUpdate: (id, updates) => db.experience.findByIdAndUpdate(id, updates),
   findByIdAndDelete: (id) => db.experience.findByIdAndDelete(id),
+  deleteMany: (query = {}) => db.experience.deleteMany(query),
   countDocuments: (query = {}) => db.experience.countDocuments(query),
 };
 
@@ -42,6 +46,7 @@ export const SkillModel = {
   create: (doc) => db.skills.create(doc),
   findByIdAndUpdate: (id, updates) => db.skills.findByIdAndUpdate(id, updates),
   findByIdAndDelete: (id) => db.skills.findByIdAndDelete(id),
+  deleteMany: (query = {}) => db.skills.deleteMany(query),
   countDocuments: (query = {}) => db.skills.countDocuments(query),
 };
 
@@ -51,6 +56,7 @@ export const MessageModel = {
   create: (doc) => db.messages.create(doc),
   findByIdAndUpdate: (id, updates) => db.messages.findByIdAndUpdate(id, updates),
   findByIdAndDelete: (id) => db.messages.findByIdAndDelete(id),
+  deleteMany: (query = {}) => db.messages.deleteMany(query),
   countDocuments: (query = {}) => db.messages.countDocuments(query),
 };
 

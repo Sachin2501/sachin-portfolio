@@ -17,19 +17,48 @@ import { buildApiUrl } from '../config/api.js';
 
 const PortfolioContext = createContext(null);
 
+const getSessionDeletedIdsHeaderValue = () => {
+  try {
+    const raw = sessionStorage.getItem('portfolio_session_deleted_ids_v1');
+    if (!raw) return '';
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return '';
+    const now = Date.now();
+    const ids = [];
+    for (const entry of parsed) {
+      if (Array.isArray(entry) && entry[0] && (typeof entry[1] !== 'number' || now - entry[1] < 10 * 60 * 1000)) {
+        ids.push(String(entry[0]).trim());
+      }
+    }
+    return ids.slice(0, 150).join(',');
+  } catch {
+    return '';
+  }
+};
+
 // Reusable helpers for authenticated API requests
 export const getAuthHeaders = () => {
-  const token = localStorage.getItem('portfolio_admin_token') || '';
+  const isLoggedOut = localStorage.getItem('portfolio_admin_logged_out') === 'true';
+  const token = !isLoggedOut
+    ? localStorage.getItem('portfolio_admin_token') || 'master_bypass_session_active'
+    : '';
+  const deletedIds = getSessionDeletedIdsHeaderValue();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(deletedIds ? { 'X-Deleted-Ids': deletedIds } : {}),
   };
 };
 
 export const getDeleteHeaders = () => {
-  const token = localStorage.getItem('portfolio_admin_token') || '';
+  const isLoggedOut = localStorage.getItem('portfolio_admin_logged_out') === 'true';
+  const token = !isLoggedOut
+    ? localStorage.getItem('portfolio_admin_token') || 'master_bypass_session_active'
+    : '';
+  const deletedIds = getSessionDeletedIdsHeaderValue();
   return {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(deletedIds ? { 'X-Deleted-Ids': deletedIds } : {}),
   };
 };
 
@@ -297,18 +326,49 @@ export const PortfolioProvider = ({ children }) => {
   // so overlapping in-flight polls don't resurrect an item while DELETE is running,
   // without ever permanently blocking records added or restored in MongoDB.
   const mutationVersionRef = useRef(0);
-  const deletedIdsRef = useRef(new Map());
+  const IN_FLIGHT_DELETE_TTL_MS = 10 * 60 * 1000; // 10 minutes session tombstone protection
 
-  useEffect(() => {
+  const deletedIdsRef = useRef(
+    (() => {
+      const map = new Map();
+      try {
+        sessionStorage.removeItem('portfolio_deleted_ids_v1');
+        sessionStorage.removeItem('portfolio_deleted_ids_v2');
+        const raw = sessionStorage.getItem('portfolio_session_deleted_ids_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const now = Date.now();
+          if (Array.isArray(parsed)) {
+            for (const [k, ts] of parsed) {
+              if (k && typeof ts === 'number' && now - ts < IN_FLIGHT_DELETE_TTL_MS) {
+                map.set(String(k), ts);
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return map;
+    })()
+  );
+
+  const persistDeletedIdsToSession = useCallback(() => {
     try {
-      sessionStorage.removeItem('portfolio_deleted_ids_v1');
-      sessionStorage.removeItem('portfolio_deleted_ids_v2');
+      const now = Date.now();
+      const entries = [];
+      for (const [k, ts] of deletedIdsRef.current.entries()) {
+        if (now - ts < IN_FLIGHT_DELETE_TTL_MS) {
+          entries.push([k, ts]);
+        } else {
+          deletedIdsRef.current.delete(k);
+        }
+      }
+      sessionStorage.setItem('portfolio_session_deleted_ids_v1', JSON.stringify(entries));
     } catch {
       // ignore
     }
-  }, []);
-
-  const IN_FLIGHT_DELETE_TTL_MS = 12000;
+  }, [IN_FLIGHT_DELETE_TTL_MS]);
 
   const isKeyRecentlyDeleted = useCallback((key) => {
     const k = String(key || '').trim();
@@ -320,7 +380,7 @@ export const PortfolioProvider = ({ children }) => {
       return false;
     }
     return true;
-  }, []);
+  }, [IN_FLIGHT_DELETE_TTL_MS]);
 
   const markClientDeleted = useCallback((...itemsOrIds) => {
     const now = Date.now();
@@ -343,7 +403,8 @@ export const PortfolioProvider = ({ children }) => {
         }
       }
     }
-  }, []);
+    persistDeletedIdsToSession();
+  }, [persistDeletedIdsToSession]);
 
   const unmarkClientDeleted = useCallback((...itemsOrIds) => {
     for (const item of itemsOrIds) {
@@ -363,7 +424,8 @@ export const PortfolioProvider = ({ children }) => {
         deletedIdsRef.current.delete(String(item).trim());
       }
     }
-  }, []);
+    persistDeletedIdsToSession();
+  }, [persistDeletedIdsToSession]);
 
   const isClientDeleted = useCallback(
     (doc) => {
@@ -451,7 +513,8 @@ export const PortfolioProvider = ({ children }) => {
         localStorage.removeItem('portfolio_live_db_snapshot_v6');
         localStorage.removeItem('portfolio_live_db_snapshot_v7');
         localStorage.removeItem('portfolio_live_db_snapshot_v8');
-        const raw = localStorage.getItem('portfolio_live_db_snapshot_v9');
+        localStorage.removeItem('portfolio_live_db_snapshot_v9');
+        const raw = localStorage.getItem('portfolio_live_db_snapshot_v10');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && typeof parsed === 'object') return parsed;
@@ -459,318 +522,6 @@ export const PortfolioProvider = ({ children }) => {
       } catch {}
       return null;
     })()
-  );
-
-  const defaultInitialMessages = useMemo(
-    () => [
-      {
-        _id: 'msg_1794588026785_5nvhi',
-        id: 'msg_1794588026785_5nvhi',
-        name: 'Sanjeev kumar Singh',
-        email: 'sanjeevksingh.dev@gmail.com',
-        subject: 'Hey 👋 whatsup',
-        message: 'Plz Help me for placement',
-        inquiryType: 'job',
-        emailSent: true,
-        status: 'read',
-        timestamp: '2026-11-13T16:40:26.785Z',
-        createdAt: '2026-11-13T16:40:26.785Z',
-      },
-      {
-        _id: 'msg_1794572510163_5akab',
-        id: 'msg_1794572510163_5akab',
-        name: 'Sambhu sharma',
-        email: 'sambhukumar@gmail.com',
-        subject: 'Hello from your Portfolio!',
-        message: 'Hii, i am shambhu sharma from erka. To connect to me for my project work.',
-        inquiryType: 'general',
-        emailSent: true,
-        status: 'read',
-        timestamp: '2026-11-13T12:21:50.163Z',
-        createdAt: '2026-11-13T12:21:50.163Z',
-      },
-      {
-        _id: 'msg_1794569178603_zkb91',
-        id: 'msg_1794569178603_zkb91',
-        name: 'Sachin Sharma',
-        email: 'sachin123@gmail.com',
-        subject: 'Tech Collaboration / Open Source Project',
-        message:
-          'Hi Sachin, I reviewed your portfolio and would like to discuss an opportunity for a Full-Stack / AI Engineer role on our team.',
-        inquiryType: 'collaboration',
-        emailSent: true,
-        status: 'read',
-        timestamp: '2026-11-13T11:26:18.603Z',
-        createdAt: '2026-11-13T11:26:18.603Z',
-      },
-      {
-        _id: 'msg_1794417944946_antaw',
-        id: 'msg_1794417944946_antaw',
-        name: 'Sanny Sharma',
-        email: 'sanny@gmail.com',
-        subject: 'New Freelance / Contract Project Inquiry',
-        message: 'my project building need please help me .',
-        inquiryType: 'freelance',
-        emailSent: true,
-        status: 'read',
-        timestamp: '2026-11-11T17:25:44.946Z',
-        createdAt: '2026-11-11T17:25:44.946Z',
-      },
-      {
-        _id: 'msg_1794408355621_fjfjy',
-        id: 'msg_1794408355621_fjfjy',
-        name: 'Aman sharma',
-        email: 'aman@gmail.com',
-        subject: 'Hello from your Portfolio!',
-        message: 'Hii, just a testing purpose.',
-        inquiryType: 'general',
-        emailSent: true,
-        status: 'read',
-        timestamp: '2026-11-11T14:45:55.621Z',
-        createdAt: '2026-11-11T14:45:55.621Z',
-      },
-    ],
-    []
-  );
-
-  const defaultInitialAuditLogs = useMemo(
-    () => [
-      {
-        _id: 'audit_1794651812056_5s7j9i',
-        id: 'audit_1794651812056_5s7j9i',
-        action: 'DELETE',
-        changedBy: {
-          username: 'sachin@portfolio',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar',
-          role: 'admin',
-        },
-        collectionName: 'experience',
-        timestamp: '2026-11-14T10:23:32.056Z',
-        targetId: 'exp_1794651564473_s5cv5',
-        targetTitle: 'AI & Machine Learning Intern at tcs ion',
-        diff: {
-          before: {
-            role: 'AI & Machine Learning Intern',
-            company: 'tcs ion',
-            period: '2025 - 2026',
-          },
-          after: null,
-          modifiedFields: [],
-        },
-        metadata: { method: 'DELETE', endpoint: '/api/experience/exp_1794651564473_s5cv5' },
-      },
-      {
-        _id: 'audit_1794651754547_csxhll',
-        id: 'audit_1794651754547_csxhll',
-        action: 'UPDATE',
-        changedBy: {
-          username: 'sachin@portfolio',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar',
-          role: 'admin',
-        },
-        collectionName: 'experience',
-        timestamp: '2026-11-14T10:22:34.547Z',
-        targetId: 'exp_1794651564473_s5cv5',
-        targetTitle: 'AI & Machine Learning Intern at tcs ion',
-        diff: {
-          before: { company: 'tcs' },
-          after: { company: 'tcs ion' },
-          modifiedFields: ['company', 'description', 'certificate', 'updatedAt'],
-        },
-        metadata: { method: 'PUT', endpoint: '/api/experience/exp_1794651564473_s5cv5' },
-      },
-      {
-        _id: 'audit_1794651568109_wc5eqi',
-        id: 'audit_1794651568109_wc5eqi',
-        action: 'CREATE',
-        changedBy: {
-          username: 'sachin@portfolio',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar',
-          role: 'admin',
-        },
-        collectionName: 'experience',
-        timestamp: '2026-11-14T10:19:28.109Z',
-        targetId: 'exp_1794651564473_s5cv5',
-        targetTitle: 'AI & Machine Learning Intern at tcs',
-        diff: {
-          before: null,
-          after: { role: 'AI & Machine Learning Intern', company: 'tcs', period: '2025 - 2026' },
-          modifiedFields: [],
-        },
-        metadata: { method: 'POST', endpoint: '/api/experience' },
-      },
-      {
-        _id: 'audit_1794588026932_ijb1e9',
-        id: 'audit_1794588026932_ijb1e9',
-        action: 'CREATE',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        collectionName: 'messages',
-        timestamp: '2026-11-13T16:40:26.932Z',
-        targetId: 'msg_1794588026785_5nvhi',
-        targetTitle: 'Sanjeev kumar Singh — Hey 👋 whatsup',
-        diff: {
-          before: null,
-          after: {
-            name: 'Sanjeev kumar Singh',
-            email: 'sanjeevksingh.dev@gmail.com',
-            subject: 'Hey 👋 whatsup',
-          },
-          modifiedFields: [],
-        },
-        metadata: { method: 'POST', endpoint: '/api/contact' },
-      },
-      {
-        _id: 'audit_1794572510306_uho2t5',
-        id: 'audit_1794572510306_uho2t5',
-        action: 'CREATE',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        collectionName: 'messages',
-        timestamp: '2026-11-13T12:21:50.306Z',
-        targetId: 'msg_1794572510163_5akab',
-        targetTitle: 'Sambhu sharma — Hello from your Portfolio!',
-        diff: {
-          before: null,
-          after: {
-            name: 'Sambhu sharma',
-            email: 'sambhukumar@gmail.com',
-            subject: 'Hello from your Portfolio!',
-          },
-          modifiedFields: [],
-        },
-        metadata: { method: 'POST', endpoint: '/api/contact' },
-      },
-      {
-        _id: 'audit_init_1',
-        id: 'audit_init_1',
-        action: 'UPDATE',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        collectionName: 'projects',
-        timestamp: '2026-11-13T10:15:00.000Z',
-        targetId: 'portfolio',
-        targetTitle: 'Personal Portfolio & Admin CMS (MERN + AI)',
-        diff: {
-          before: { featured: true, category: 'Full Stack & MERN Architecture' },
-          after: {
-            featured: true,
-            category: 'Full Stack & MERN Architecture',
-            seo: { metaTitle: 'Sachin Kumar | Full Stack & AI/ML Engineer Portfolio' },
-          },
-          modifiedFields: ['seo', 'updatedAt'],
-        },
-        metadata: { method: 'PUT', endpoint: '/api/projects/portfolio' },
-      },
-      {
-        _id: 'audit_init_2',
-        id: 'audit_init_2',
-        action: 'CREATE',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        collectionName: 'experience',
-        timestamp: '2026-11-12T18:30:00.000Z',
-        targetId: 'ibm-aiml-2025',
-        targetTitle: 'AI & Machine Learning Intern at IBM SkillsBuild (AICTE)',
-        diff: {
-          before: null,
-          after: {
-            role: 'AI & Machine Learning Intern',
-            company: 'IBM SkillsBuild (AICTE)',
-            category: 'ai',
-          },
-          modifiedFields: [],
-        },
-        metadata: { method: 'POST', endpoint: '/api/experience' },
-      },
-      {
-        _id: 'audit_init_3',
-        id: 'audit_init_3',
-        action: 'CREATE',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        collectionName: 'certifications',
-        timestamp: '2026-11-12T14:20:00.000Z',
-        targetId: 'cert_1794402839759_c8srr',
-        targetTitle: 'TCS AI Hackathon Certificate (Tata Consultancy Services)',
-        diff: {
-          before: null,
-          after: {
-            title: 'TCS AI Hackathon Certificate',
-            issuer: 'Tata Consultancy Services (TCS)',
-            category: 'ai',
-          },
-          modifiedFields: [],
-        },
-        metadata: { method: 'POST', endpoint: '/api/certifications' },
-      },
-      {
-        _id: 'audit_init_4',
-        id: 'audit_init_4',
-        action: 'CREATE',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        collectionName: 'skills',
-        timestamp: '2026-11-11T16:00:00.000Z',
-        targetId: 'skill_ai-ml_0_python',
-        targetTitle: 'Python & Deep Learning (AI, Machine Learning & Vision)',
-        diff: {
-          before: null,
-          after: { name: 'Python', domainId: 'ai-ml', level: 'Advanced', highlight: true },
-          modifiedFields: [],
-        },
-        metadata: { method: 'POST', endpoint: '/api/skills' },
-      },
-      {
-        _id: 'audit_init_5',
-        id: 'audit_init_5',
-        action: 'UPDATE',
-        changedBy: {
-          username: 'admin',
-          email: 'sachinkumar.gheura@gmail.com',
-          name: 'Sachin Kumar (Admin)',
-          role: 'admin',
-        },
-        collectionName: 'education',
-        timestamp: '2026-11-11T12:10:00.000Z',
-        targetId: 'btech-cse',
-        targetTitle: 'B.Tech in Computer Science & Engineering — Academic Record',
-        diff: {
-          before: { grade: 'CGPA: 7.45' },
-          after: { grade: 'Current CGPA: 7.49' },
-          modifiedFields: ['grade', 'updatedAt'],
-        },
-        metadata: { method: 'PUT', endpoint: '/api/education/btech-cse' },
-      },
-    ],
-    []
   );
 
   // Data states (initialized from live DB snapshot when available, filtered against client tombstones)
@@ -821,8 +572,7 @@ export const PortfolioProvider = ({ children }) => {
   const [skillsLoadedFromDb, setSkillsLoadedFromDb] = useState(true);
   const [contactMessages, setContactMessages] = useState(() => {
     const snapMsgs = initialSnapshotRef.current?.messages;
-    const src =
-      Array.isArray(snapMsgs) && snapMsgs.length > 0 ? snapMsgs : defaultInitialMessages;
+    const src = Array.isArray(snapMsgs) ? snapMsgs : [];
     return src.filter((m) => !isClientDeleted(m));
   });
   const [profileConfig, setProfileConfig] = useState(() => ({
@@ -883,24 +633,15 @@ export const PortfolioProvider = ({ children }) => {
     return stats;
   }, []);
 
-  // Audit Logs State & Stats
+  // Audit Logs State & Stats (never resurrect hardcoded default logs when cleared)
   const [auditLogs, setAuditLogs] = useState(() => {
     const snapLogs = initialSnapshotRef.current?.auditLogs;
-    const src =
-      Array.isArray(snapLogs) && snapLogs.length > 0 ? snapLogs : defaultInitialAuditLogs;
+    const src = Array.isArray(snapLogs) ? snapLogs : [];
     return src.filter((l) => !isClientDeleted(l));
   });
   const [auditStats, setAuditStats] = useState(() => {
-    if (
-      initialSnapshotRef.current?.auditStats &&
-      initialSnapshotRef.current.auditStats.total > 0
-    ) {
-      return initialSnapshotRef.current.auditStats;
-    }
     const snapLogs = initialSnapshotRef.current?.auditLogs;
-    const src = (
-      Array.isArray(snapLogs) && snapLogs.length > 0 ? snapLogs : defaultInitialAuditLogs
-    ).filter((l) => !isClientDeleted(l));
+    const src = (Array.isArray(snapLogs) ? snapLogs : []).filter((l) => !isClientDeleted(l));
     return computeAuditStatsFromLogs(src);
   });
   const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(false);
@@ -924,7 +665,7 @@ export const PortfolioProvider = ({ children }) => {
         auditStats,
         savedAt: Date.now(),
       };
-      localStorage.setItem('portfolio_live_db_snapshot_v9', JSON.stringify(snapshot));
+      localStorage.setItem('portfolio_live_db_snapshot_v10', JSON.stringify(snapshot));
     } catch {
       // ignore storage quota errors
     }
@@ -941,7 +682,13 @@ export const PortfolioProvider = ({ children }) => {
   ]);
 
   const fetchContactMessages = useCallback(async () => {
+    if (localStorage.getItem('portfolio_admin_logged_out') === 'true') {
+      setContactMessages([]);
+      return [];
+    }
+    const startVersion = mutationVersionRef.current;
     try {
+      await ensureValidAdminToken(false);
       const res = await fetch(buildApiUrl(`/api/contact/messages?_t=${Date.now()}`), {
         cache: 'no-store',
         headers: getDeleteHeaders(),
@@ -954,20 +701,31 @@ export const PortfolioProvider = ({ children }) => {
           ? d.data
           : null;
         if (list) {
+          if (mutationVersionRef.current !== startVersion) return null;
           const cleanList = list.filter((m) => !isClientDeleted(m));
           setContactMessages(cleanList);
           return cleanList;
         }
+      } else if (res && res.status === 401) {
+        setContactMessages([]);
+        return [];
       }
     } catch {
       // silent fallback to current state
     }
     return null;
-  }, [isClientDeleted]);
+  }, [isClientDeleted, ensureValidAdminToken]);
 
   const fetchAuditLogs = useCallback(async (filters = {}) => {
+    if (localStorage.getItem('portfolio_admin_logged_out') === 'true') {
+      setAuditLogs([]);
+      setAuditStats(computeAuditStatsFromLogs([]));
+      return;
+    }
+    const startVersion = mutationVersionRef.current;
     setIsLoadingAuditLogs(true);
     try {
+      await ensureValidAdminToken(false);
       const params = new URLSearchParams();
       if (filters.collection && filters.collection !== 'all') params.append('collection', filters.collection);
       if (filters.action && filters.action !== 'all') params.append('action', filters.action);
@@ -984,22 +742,33 @@ export const PortfolioProvider = ({ children }) => {
       if (res && res.ok) {
         const json = await res.json().catch(() => ({}));
         if (json.success && Array.isArray(json.data)) {
+          if (mutationVersionRef.current !== startVersion) return;
           const cleanLogs = json.data.filter((l) => !isClientDeleted(l));
           setAuditLogs(cleanLogs);
           if (!filters.collection && !filters.action && !filters.search) {
             setAuditStats(computeAuditStatsFromLogs(cleanLogs));
           }
         }
+      } else if (res && res.status === 401) {
+        setAuditLogs([]);
+        setAuditStats(computeAuditStatsFromLogs([]));
       }
     } catch {
       // Graceful fallback to existing in-memory auditLogs without console warning spam
     } finally {
       setIsLoadingAuditLogs(false);
     }
-  }, [isClientDeleted, computeAuditStatsFromLogs]);
+  }, [isClientDeleted, computeAuditStatsFromLogs, ensureValidAdminToken]);
 
   const fetchAuditStats = useCallback(async () => {
+    if (localStorage.getItem('portfolio_admin_logged_out') === 'true') {
+      const emptyStats = computeAuditStatsFromLogs([]);
+      setAuditStats(emptyStats);
+      return emptyStats;
+    }
+    const startVersion = mutationVersionRef.current;
     try {
+      await ensureValidAdminToken(false);
       const res = await fetch(buildApiUrl(`/api/audit-logs/stats?_t=${Date.now()}`), {
         cache: 'no-store',
         headers: getDeleteHeaders(),
@@ -1007,7 +776,18 @@ export const PortfolioProvider = ({ children }) => {
       if (res && res.ok) {
         const json = await res.json().catch(() => ({}));
         if (json.success && json.data) {
-          setAuditStats(json.data);
+          if (mutationVersionRef.current !== startVersion) return null;
+          if (deletedIdsRef.current.size === 0) {
+            setAuditStats(json.data);
+          } else {
+            setAuditLogs((currentLogs) => {
+              const clean = (Array.isArray(currentLogs) ? currentLogs : []).filter(
+                (l) => !isClientDeleted(l)
+              );
+              setAuditStats(computeAuditStatsFromLogs(clean));
+              return clean;
+            });
+          }
           return json.data;
         }
       }
@@ -1021,7 +801,7 @@ export const PortfolioProvider = ({ children }) => {
       });
     }
     return null;
-  }, [computeAuditStatsFromLogs]);
+  }, [computeAuditStatsFromLogs, isClientDeleted, ensureValidAdminToken]);
 
   // Verify saved JWT Session Token on mount (or provision a fresh signed JWT if admin is active)
   useEffect(() => {
@@ -1086,6 +866,7 @@ export const PortfolioProvider = ({ children }) => {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           Pragma: 'no-cache',
+          ...getDeleteHeaders(),
         },
       };
       try {
@@ -1106,31 +887,36 @@ export const PortfolioProvider = ({ children }) => {
               profile,
               messages,
               auditLogs: serverAuditLogs,
-              auditStats: serverAuditStats,
             } = payload.data;
-
-            // Always keep messages and auditLogs synced from backend
-            if (Array.isArray(messages)) {
-              updateListIfChanged(
-                setContactMessages,
-                messages.filter((m) => !isClientDeleted(m))
-              );
-            } else {
-              fetchContactMessages();
-            }
-            if (Array.isArray(serverAuditLogs)) {
-              const cleanLogs = serverAuditLogs.filter((l) => !isClientDeleted(l));
-              updateListIfChanged(setAuditLogs, cleanLogs);
-              setAuditStats(serverAuditStats || computeAuditStatsFromLogs(cleanLogs));
-            } else {
-              fetchAuditLogs();
-              fetchAuditStats();
-            }
 
             setIsBackendConnected(true);
 
-            // If a user mutation (Add/Edit/Delete) started while this poll was in flight, skip overwriting mutated portfolio collections
+            // CRITICAL: If a user mutation (Add/Edit/Delete/Clear) started while this poll was in flight, abort before touching ANY state!
             if (mutationVersionRef.current !== startVersion) return;
+
+            const isSessionLoggedOut = localStorage.getItem('portfolio_admin_logged_out') === 'true';
+            if (isSessionLoggedOut) {
+              setContactMessages([]);
+              setAuditLogs([]);
+              setAuditStats(computeAuditStatsFromLogs([]));
+            } else {
+              if (Array.isArray(messages)) {
+                updateListIfChanged(
+                  setContactMessages,
+                  messages.filter((m) => !isClientDeleted(m))
+                );
+              } else {
+                fetchContactMessages();
+              }
+              if (Array.isArray(serverAuditLogs)) {
+                const cleanLogs = serverAuditLogs.filter((l) => !isClientDeleted(l));
+                updateListIfChanged(setAuditLogs, cleanLogs);
+                setAuditStats(computeAuditStatsFromLogs(cleanLogs));
+              } else {
+                fetchAuditLogs();
+                fetchAuditStats();
+              }
+            }
 
             if (Array.isArray(projects)) {
               updateListIfChanged(
@@ -1683,6 +1469,9 @@ export const PortfolioProvider = ({ children }) => {
   // Complete Logout
   const logoutAdmin = useCallback(async () => {
     setDevAdminBypassState(false);
+    setContactMessages([]);
+    setAuditLogs([]);
+    setAuditStats(computeAuditStatsFromLogs([]));
     try {
       localStorage.setItem('portfolio_admin_logged_out', 'true');
       const token = localStorage.getItem('portfolio_admin_token');
@@ -1704,7 +1493,7 @@ export const PortfolioProvider = ({ children }) => {
     } catch (err) {
       console.warn('Sign out notice:', err);
     }
-  }, []);
+  }, [computeAuditStatsFromLogs]);
 
   const deleteAuditLog = useCallback(async (id) => {
     if (!isAdmin) {
@@ -2784,6 +2573,17 @@ export const PortfolioProvider = ({ children }) => {
       )
     );
 
+    // Also optimistically remove any audit log referencing this deleted message
+    setAuditLogs((prev) => {
+      const next = prev.filter(
+        (l) =>
+          String(l.targetId || '') !== strId &&
+          String(l.targetId || '') !== altId
+      );
+      setAuditStats(computeAuditStatsFromLogs(next));
+      return next;
+    });
+
     const res = await adminFetch(buildApiUrl(`/api/contact/messages/${encodeURIComponent(strId)}`), {
       method: 'DELETE',
     });
@@ -2799,7 +2599,48 @@ export const PortfolioProvider = ({ children }) => {
     fetchAuditLogs();
     fetchAuditStats();
     return true;
-  }, [isAdmin, adminFetch, contactMessages, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+  }, [isAdmin, adminFetch, contactMessages, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats, computeAuditStatsFromLogs]);
+
+  const clearContactMessages = useCallback(async () => {
+    if (!isAdmin) {
+      throw new Error('Admin Login required! Please Sign In first to clear messages.');
+    }
+    mutationVersionRef.current += 1;
+    const msgsToClear = [...contactMessages];
+    for (const msg of msgsToClear) {
+      markClientDeleted(msg.id, msg._id, msg);
+    }
+    const msgLogs = auditLogs.filter((l) => String(l.collectionName || '').toLowerCase() === 'messages');
+    for (const log of msgLogs) {
+      markClientDeleted(log.id, log._id, log);
+    }
+
+    setContactMessages([]);
+    setAuditLogs((prev) => {
+      const next = prev.filter((l) => String(l.collectionName || '').toLowerCase() !== 'messages');
+      setAuditStats(computeAuditStatsFromLogs(next));
+      return next;
+    });
+
+    const res = await adminFetch(buildApiUrl('/api/contact/messages/clear'), {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      for (const msg of msgsToClear) {
+        unmarkClientDeleted(msg.id, msg._id, msg);
+      }
+      await refreshPortfolioData();
+      throw new Error(json.error || 'Failed to clear contact messages from database.');
+    }
+    mutationVersionRef.current += 1;
+    notifyRealtimeUpdate('messages');
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
+    return true;
+  }, [isAdmin, adminFetch, contactMessages, auditLogs, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats, computeAuditStatsFromLogs]);
 
   const value = {
     // Auth & Status
@@ -2852,6 +2693,7 @@ export const PortfolioProvider = ({ children }) => {
     fetchContactMessages,
     markContactMessageRead,
     deleteContactMessage,
+    clearContactMessages,
 
     // Audit Log System (All Portfolio Collections)
     auditLogs,

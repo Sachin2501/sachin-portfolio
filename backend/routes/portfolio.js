@@ -13,7 +13,11 @@ import {
   AuditLogModel,
 } from '../models/index.js';
 import { db, realtimeBus } from '../db/database.js';
-import { authenticateAdmin } from '../middleware/auth.js';
+import {
+  authenticateAdmin,
+  getAuthenticatedAdmin,
+  extractClientDeletedSet,
+} from '../middleware/auth.js';
 import {
   validateProject,
   validateCertification,
@@ -228,6 +232,8 @@ portfolioRouter.get('/portfolio', async (req, res) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
+    const adminUser = getAuthenticatedAdmin(req);
+    const clientDeletedSet = extractClientDeletedSet(req);
     const isLight = req.query.light === '1' || req.query.light === 'true';
     const forceSync = req.query.sync === '1' || req.query.force === '1';
     if (forceSync) {
@@ -242,34 +248,70 @@ portfolioRouter.get('/portfolio', async (req, res) => {
         ExperienceModel.find(),
         SkillModel.find(),
         ProfileModel.get(),
-        MessageModel.find({}),
-        AuditLogModel.find(),
+        adminUser ? MessageModel.find({}) : Promise.resolve([]),
+        adminUser ? AuditLogModel.find() : Promise.resolve([]),
         db.getHealth(),
       ]);
+
+    const msgDeletedSet = db.messages.getDeletedSet();
+    const auditDeletedSet = db.auditLogs.getDeletedSet();
+
+    const activeMessages = adminUser && Array.isArray(rawMessages)
+      ? rawMessages.filter((m) => {
+          if (!m) return false;
+          if (db.messages.isDocDeleted(m, msgDeletedSet)) return false;
+          const mId = String(m.id ?? m._id ?? '');
+          const mMongoId = String(m._id ?? m.id ?? '');
+          if (clientDeletedSet.has(mId) || clientDeletedSet.has(mMongoId)) return false;
+          return true;
+        })
+      : [];
+
+    const activeAuditLogs = adminUser && Array.isArray(rawAuditLogs)
+      ? rawAuditLogs.filter((l) => {
+          if (!l) return false;
+          if (db.auditLogs.isDocDeleted(l, auditDeletedSet)) return false;
+          const lId = String(l.id ?? l._id ?? '');
+          const lMongoId = String(l._id ?? l.id ?? '');
+          const targetId = String(l.targetId ?? '');
+          if (
+            clientDeletedSet.has(lId) ||
+            clientDeletedSet.has(lMongoId) ||
+            (targetId && clientDeletedSet.has(targetId))
+          ) {
+            return false;
+          }
+          if (
+            String(l.collectionName || '').toLowerCase() === 'messages' &&
+            targetId &&
+            msgDeletedSet.has(targetId)
+          ) {
+            return false;
+          }
+          return true;
+        })
+      : [];
 
     const cleanExperience = (experience || []).filter((e) => e.role !== 'Senior Full Stack Engineer');
     const wireCertifications = (certifications || []).map(optimizeCertForWire);
     const wireProfile = optimizeProfileForWire(profile, isLight);
-    const sortedMessages = Array.isArray(rawMessages)
-      ? [...rawMessages].sort((a, b) => {
-          const tA = new Date(a.timestamp || a.createdAt || 0).getTime() || 0;
-          const tB = new Date(b.timestamp || b.createdAt || 0).getTime() || 0;
-          return tB - tA;
-        })
-      : [];
-    const sortedAuditLogs = Array.isArray(rawAuditLogs)
-      ? [...rawAuditLogs].sort(
-          (a, b) =>
-            (new Date(b.timestamp || b.createdAt || 0).getTime() || 0) -
-            (new Date(a.timestamp || a.createdAt || 0).getTime() || 0)
-        )
-      : [];
+    const sortedMessages = [...activeMessages].sort((a, b) => {
+      const tA = new Date(a.timestamp || a.createdAt || 0).getTime() || 0;
+      const tB = new Date(b.timestamp || b.createdAt || 0).getTime() || 0;
+      return tB - tA;
+    });
+    const sortedAuditLogs = [...activeAuditLogs].sort(
+      (a, b) =>
+        (new Date(b.timestamp || b.createdAt || 0).getTime() || 0) -
+        (new Date(a.timestamp || a.createdAt || 0).getTime() || 0)
+    );
     const auditStats = buildAuditStatsSummary(sortedAuditLogs);
 
     res.json({
       success: true,
       status: 'healthy',
       endpoint: '/api/portfolio',
+      authenticatedAdmin: Boolean(adminUser),
       runtime: 'Node.js ' + process.version,
       uptimeSeconds: Math.floor(process.uptime()),
       database: dbHealth,

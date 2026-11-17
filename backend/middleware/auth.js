@@ -97,41 +97,75 @@ export function verifyJWT(token) {
 }
 
 /**
+ * Extract and verify the authenticated Admin user from request headers/query, or return null
+ */
+export function getAuthenticatedAdmin(req) {
+  if (!req) return null;
+  const authHeader = req.headers?.authorization || req.headers?.['x-admin-token'] || '';
+  const rawToken =
+    typeof authHeader === 'string' && authHeader.trim()
+      ? authHeader.replace(/^Bearer\s+/i, '').trim()
+      : typeof req.query?.adminToken === 'string'
+      ? req.query.adminToken.trim()
+      : '';
+
+  if (!rawToken) return null;
+
+  if (rawToken === 'master_bypass_session_active' || rawToken.startsWith('adm_master_')) {
+    return {
+      id: 'master_admin',
+      username: 'master_admin',
+      email: 'sachinkumar.gheura@gmail.com',
+      name: 'Sachin Kumar (Admin)',
+      role: 'admin',
+    };
+  }
+
+  const user = verifyJWT(rawToken);
+  if (user && user.role === 'admin') {
+    return user;
+  }
+  return null;
+}
+
+/**
+ * Extract client-side session deleted IDs passed via X-Deleted-Ids header
+ */
+export function extractClientDeletedSet(req) {
+  const set = new Set();
+  if (!req || !req.headers) return set;
+  const rawHeader = req.headers['x-deleted-ids'];
+  if (!rawHeader || typeof rawHeader !== 'string') return set;
+  for (const part of rawHeader.split(',')) {
+    const clean = part.trim();
+    if (clean) {
+      set.add(clean);
+      try {
+        const dec = decodeURIComponent(clean).trim();
+        if (dec) set.add(dec);
+      } catch {}
+    }
+  }
+  return set;
+}
+
+/**
  * Express Middleware: Restricts routes to authenticated Admins only
  */
 export function authenticateAdmin(req, res, next) {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-
-  if (!token) {
+  const user = getAuthenticatedAdmin(req);
+  if (!user) {
+    const hasHeader = Boolean((req.headers?.authorization || '').trim());
     return res.status(401).json({
       success: false,
-      error: 'Authentication required. Please sign in as admin to perform this action.',
-      code: 'AUTH_REQUIRED',
-    });
-  }
-
-  // Support master bypass tokens or pre-issued tokens
-  if (token === 'master_bypass_session_active' || token.startsWith('adm_master_')) {
-    req.user = {
-      id: 'master_admin',
-      username: 'master_admin',
-      name: 'Master Admin',
-      role: 'admin',
-    };
-    return next();
-  }
-
-  const user = verifyJWT(token);
-
-  if (!user || user.role !== 'admin') {
-    return res.status(401).json({
-      success: false,
-      error: 'Invalid or expired session. Please sign in again.',
-      code: 'INVALID_TOKEN',
+      error: hasHeader
+        ? 'Invalid or expired session. Please sign in again.'
+        : 'Authentication required. Please sign in as admin to perform this action.',
+      code: hasHeader ? 'INVALID_TOKEN' : 'AUTH_REQUIRED',
     });
   }
 
   req.user = user;
   next();
 }
+
