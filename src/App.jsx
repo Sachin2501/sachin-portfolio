@@ -25,7 +25,12 @@ export const App = () => {
       const pathname = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
       const params = new URLSearchParams(window.location.search);
-      if (pathname === '/admin' || hash === '#admin' || params.get('view') === 'admin') {
+      if (
+        pathname === '/admin' ||
+        pathname.startsWith('/admin/') ||
+        hash === '#admin' ||
+        params.get('view') === 'admin'
+      ) {
         return 'admin';
       }
     }

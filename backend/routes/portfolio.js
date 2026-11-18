@@ -26,12 +26,70 @@ import {
   validateSkill,
 } from '../models/validators.js';
 import { recordAuditLog } from '../services/auditLogger.js';
+import multer from 'multer';
+import {
+  CLOUDINARY_CERTIFICATES_FOLDER,
+  CLOUDINARY_RESUME_FOLDER,
+  MAX_PDF_SIZE_BYTES,
+  ensureCloudinaryConfigured,
+  validateUploadedFile,
+  uploadBufferToCloudinary,
+  parseCloudinaryUrl,
+  deleteFromCloudinary,
+  resolveOldCertificateFile,
+} from '../services/cloudinaryService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PROJECT_ROOT_DIR = path.resolve(__dirname, '../..');
 const PUBLIC_CERT_PREVIEWS_DIR = path.resolve(__dirname, '../../public/certificates/previews');
 
 export const portfolioRouter = Router();
+
+// Multer memory storage with 10 MB ceiling (5 MB image limit enforced in validateUploadedFile)
+const uploadMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PDF_SIZE_BYTES },
+});
+
+/**
+ * Middleware that parses multipart/form-data (single "file" field) when present,
+ * and validates file type (pdf, jpg, jpeg, png, webp) and file size (<=5MB image, <=10MB PDF).
+ * Passes through JSON requests untouched.
+ */
+function handleMultipartFile(req, res, next) {
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (!contentType.includes('multipart/form-data')) {
+    return next();
+  }
+
+  uploadMemory.single('file')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: 'File is too large. Maximum allowed size is 5 MB for images and 10 MB for PDFs.',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: err.message || 'Invalid file upload request.',
+      });
+    }
+
+    if (req.file) {
+      const check = validateUploadedFile(req.file);
+      if (!check.valid) {
+        return res.status(400).json({
+          success: false,
+          error: check.error,
+        });
+      }
+    }
+
+    return next();
+  });
+}
 
 // ==========================================
 // 0A. REAL-TIME SERVER-SENT EVENTS STREAM (GET /api/realtime/stream)
@@ -158,7 +216,14 @@ function optimizeCertForWire(c) {
     }
   }
 
-  const rawFile = String(clone.file || clone.link || '').trim().split('?')[0];
+  if (clone.fileUrl && typeof clone.fileUrl === 'string' && clone.fileUrl.trim()) {
+    if (!clone.file) clone.file = clone.fileUrl;
+    if (!clone.link || clone.link === '#') clone.link = clone.fileUrl;
+    if (clone.fileType === 'image' && !clone.image) clone.image = clone.fileUrl;
+    if (clone.fileType === 'image' && !clone.preview) clone.preview = clone.fileUrl;
+  }
+
+  const rawFile = String(clone.fileUrl || clone.file || clone.link || '').trim().split('?')[0];
   if (
     !clone.preview &&
     !clone.image &&
@@ -653,21 +718,48 @@ portfolioRouter.get(['/certifications/:id/file.pdf', '/certifications/:id/file']
   }
 });
 
-portfolioRouter.post('/certifications', authenticateAdmin, async (req, res) => {
+portfolioRouter.post('/certifications', authenticateAdmin, handleMultipartFile, async (req, res) => {
+  let uploadedAsset = null;
   try {
-    const validation = validateCertification(req.body, false);
+    const bodyData = { ...(req.body || {}) };
+
+    // If a file was uploaded via multipart/form-data, upload to Cloudinary folder "portfolio/certificates"
+    if (req.file) {
+      uploadedAsset = await uploadBufferToCloudinary(req.file, CLOUDINARY_CERTIFICATES_FOLDER);
+      bodyData.fileUrl = uploadedAsset.fileUrl;
+      bodyData.publicId = uploadedAsset.publicId;
+      bodyData.resourceType = uploadedAsset.resourceType;
+      bodyData.fileType = uploadedAsset.fileType;
+      bodyData.originalName = uploadedAsset.originalName;
+      bodyData.file = uploadedAsset.fileUrl;
+      if (uploadedAsset.fileType === 'image') {
+        bodyData.image = uploadedAsset.fileUrl;
+        bodyData.preview = bodyData.preview || uploadedAsset.fileUrl;
+      } else {
+        bodyData.image = bodyData.preview || '';
+      }
+      if (!bodyData.link) {
+        bodyData.link = uploadedAsset.fileUrl;
+      }
+    }
+
+    const validation = validateCertification(bodyData, false);
     if (!validation.isValid) {
+      if (uploadedAsset?.publicId) {
+        await deleteFromCloudinary(uploadedAsset.publicId, uploadedAsset.resourceType);
+      }
       return res.status(400).json({ success: false, error: validation.errors.join(' ') });
     }
 
-    const certId = req.body.id || `cert_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const nowIso = new Date().toISOString();
+    const certId = bodyData.id || `cert_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const newCert = await CertificationModel.create({
-      ...req.body,
+      ...bodyData,
       ...validation.value,
       id: certId,
       authorUid: req.user?.username || 'admin',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: nowIso,
+      updatedAt: nowIso,
     });
 
     await recordAuditLog({
@@ -680,37 +772,68 @@ portfolioRouter.post('/certifications', authenticateAdmin, async (req, res) => {
     });
 
     const wireNewCert = optimizeCertForWire(newCert);
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: `Certification "${newCert.title}" saved to MongoDB!`,
       data: wireNewCert,
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    // Roll back Cloudinary upload if DB save failed so no orphan files remain
+    if (uploadedAsset?.publicId) {
+      await deleteFromCloudinary(uploadedAsset.publicId, uploadedAsset.resourceType).catch(() => {});
+    }
+    const status = err.statusCode || 500;
+    return res.status(status).json({ success: false, error: err.message });
   }
 });
 
-portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) => {
+portfolioRouter.put('/certifications/:id', authenticateAdmin, handleMultipartFile, async (req, res) => {
+  let uploadedAsset = null;
   try {
     const rawId = decodeURIComponent(req.params.id || '').trim();
     const existing = await CertificationModel.findById(rawId);
 
+    const bodyData = { ...(req.body || {}) };
+
+    // When replacing the file: upload the new one to Cloudinary FIRST
+    if (req.file) {
+      uploadedAsset = await uploadBufferToCloudinary(req.file, CLOUDINARY_CERTIFICATES_FOLDER);
+      bodyData.fileUrl = uploadedAsset.fileUrl;
+      bodyData.publicId = uploadedAsset.publicId;
+      bodyData.resourceType = uploadedAsset.resourceType;
+      bodyData.fileType = uploadedAsset.fileType;
+      bodyData.originalName = uploadedAsset.originalName;
+      // Update legacy link fields too so old consumers stay in sync
+      bodyData.file = uploadedAsset.fileUrl;
+      if (uploadedAsset.fileType === 'image') {
+        bodyData.image = uploadedAsset.fileUrl;
+        bodyData.preview = uploadedAsset.fileUrl;
+      } else {
+        bodyData.image = bodyData.preview || '';
+        bodyData.preview = bodyData.preview || '';
+      }
+      bodyData.link = bodyData.link || uploadedAsset.fileUrl;
+    }
+
     const mergedCandidate = {
-      title: existing?.title || req.body?.title || 'Professional Certification',
-      issuer: existing?.issuer || req.body?.issuer || 'Credential Authority',
+      title: existing?.title || bodyData?.title || 'Professional Certification',
+      issuer: existing?.issuer || bodyData?.issuer || 'Credential Authority',
       ...(existing || {}),
-      ...(req.body || {}),
+      ...bodyData,
     };
 
     const validation = validateCertification(mergedCandidate, true);
     if (!validation.isValid) {
+      if (uploadedAsset?.publicId) {
+        await deleteFromCloudinary(uploadedAsset.publicId, uploadedAsset.resourceType);
+      }
       return res.status(400).json({ success: false, error: validation.errors.join(' ') });
     }
 
     const targetId = existing?.id || existing?._id || rawId;
     const payload = {
       ...(existing || {}),
-      ...req.body,
+      ...bodyData,
       ...validation.value,
       id: targetId,
       _id: existing?._id || targetId,
@@ -725,6 +848,26 @@ portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) =
       });
     }
 
+    // If a new file was uploaded and saved to DB, delete the old file from Cloudinary
+    if (uploadedAsset && existing) {
+      let oldPublicId = existing.publicId || '';
+      let oldResourceType = existing.resourceType || (existing.fileType === 'pdf' ? 'raw' : 'image');
+
+      if (!oldPublicId) {
+        const oldUrlCandidate =
+          existing.fileUrl || existing.file || existing.image || existing.preview || existing.link || '';
+        const parsedOld = parseCloudinaryUrl(oldUrlCandidate);
+        if (parsedOld) {
+          oldPublicId = parsedOld.publicId;
+          oldResourceType = parsedOld.resourceType;
+        }
+      }
+
+      if (oldPublicId && oldPublicId !== uploadedAsset.publicId) {
+        await deleteFromCloudinary(oldPublicId, oldResourceType);
+      }
+    }
+
     if (updated) {
       await recordAuditLog({
         req,
@@ -734,7 +877,7 @@ portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) =
         targetTitle: `${updated.title || existing?.title || targetId} (${updated.issuer || existing?.issuer || 'Credential'})`,
         before: existing,
         after: updated,
-        modifiedFields: Object.keys(req.body || {}),
+        modifiedFields: Object.keys(bodyData || {}),
       });
       return res.json({
         success: true,
@@ -744,7 +887,11 @@ portfolioRouter.put('/certifications/:id', authenticateAdmin, async (req, res) =
     }
     return res.status(404).json({ success: false, error: 'Certification not found' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    if (uploadedAsset?.publicId) {
+      await deleteFromCloudinary(uploadedAsset.publicId, uploadedAsset.resourceType).catch(() => {});
+    }
+    const status = err.statusCode || 500;
+    return res.status(status).json({ success: false, error: err.message });
   }
 });
 
@@ -752,6 +899,51 @@ portfolioRouter.delete('/certifications/:id', authenticateAdmin, async (req, res
   try {
     const rawId = decodeURIComponent(req.params.id || '').trim();
     const existing = await CertificationModel.findById(rawId);
+
+    let cloudinaryDeleted = false;
+    let cloudinaryNotice = null;
+
+    if (existing) {
+      if (existing.publicId) {
+        // 1. Stored publicId exists -> delete from Cloudinary first
+        const resType =
+          existing.resourceType || (existing.fileType === 'pdf' ? 'raw' : 'image');
+        const delResult = await deleteFromCloudinary(existing.publicId, resType);
+        cloudinaryDeleted = Boolean(delResult.deleted);
+      } else {
+        // 2. Old record without publicId -> try deriving publicId & resourceType from old Cloudinary URL
+        const candidateUrls = [
+          existing.fileUrl,
+          existing.file,
+          existing.image,
+          existing.preview,
+          existing.link,
+        ].filter((u) => typeof u === 'string' && u.trim());
+
+        let parsedCloudinary = null;
+        for (const url of candidateUrls) {
+          parsedCloudinary = parseCloudinaryUrl(url);
+          if (parsedCloudinary) break;
+        }
+
+        if (parsedCloudinary) {
+          const delResult = await deleteFromCloudinary(
+            parsedCloudinary.publicId,
+            parsedCloudinary.resourceType
+          );
+          cloudinaryDeleted = Boolean(delResult.deleted);
+          if (!cloudinaryDeleted) {
+            cloudinaryNotice =
+              'Certificate deleted from database. The derived Cloudinary file was already missing or could not be removed from Cloudinary.';
+          }
+        } else {
+          // Old link is not a Cloudinary URL (or parsing failed) -> skip Cloudinary deletion, delete DB record
+          cloudinaryNotice =
+            'Certificate deleted from database. The old file was not a Cloudinary URL, so it was not removed from Cloudinary.';
+        }
+      }
+    }
+
     const deleted = await CertificationModel.findByIdAndDelete(rawId);
     if (existing?.id && String(existing.id) !== rawId) {
       await CertificationModel.findByIdAndDelete(String(existing.id));
@@ -769,9 +961,399 @@ portfolioRouter.delete('/certifications/:id', authenticateAdmin, async (req, res
         before: existing,
       });
     }
-    return res.json({ success: true, message: 'Certification deleted from MongoDB' });
+    return res.json({
+      success: true,
+      cloudinaryDeleted,
+      notice: cloudinaryNotice,
+      message: cloudinaryNotice || 'Certification deleted from Cloudinary and MongoDB.',
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// One-time idempotent migration endpoint for old certificates in MongoDB Atlas
+portfolioRouter.post('/admin/migrate-certificates', authenticateAdmin, async (req, res) => {
+  try {
+    const allCerts = await CertificationModel.find();
+    let updatedCount = 0;
+    let skippedCount = 0;
+    const details = [];
+
+    for (const cert of allCerts) {
+      const docId = cert._id || cert.id;
+      if (!docId) {
+        skippedCount++;
+        continue;
+      }
+
+      // Already has publicId, resourceType, fileUrl, and fileType -> idempotent skip
+      if (cert.publicId && cert.resourceType && cert.fileUrl && cert.fileType) {
+        skippedCount++;
+        details.push({
+          id: String(docId),
+          title: cert.title,
+          status: 'skipped_already_migrated',
+          publicId: cert.publicId,
+        });
+        continue;
+      }
+
+      const candidateUrls = [
+        cert.fileUrl,
+        cert.file,
+        cert.image,
+        cert.preview,
+        cert.link,
+      ].filter((u) => typeof u === 'string' && u.trim());
+
+      let parsed = null;
+      for (const url of candidateUrls) {
+        parsed = parseCloudinaryUrl(url);
+        if (parsed) break;
+      }
+
+      // Do NOT modify documents that do not have a parseable Cloudinary URL
+      if (!parsed) {
+        skippedCount++;
+        details.push({
+          id: String(docId),
+          title: cert.title,
+          status: 'skipped_non_cloudinary_url',
+        });
+        continue;
+      }
+
+      let derivedOriginalName = cert.originalName || '';
+      if (!derivedOriginalName) {
+        try {
+          derivedOriginalName = path.basename(decodeURIComponent(new URL(parsed.fileUrl).pathname));
+        } catch {
+          derivedOriginalName = '';
+        }
+      }
+
+      const setFields = {
+        fileUrl: cert.fileUrl || parsed.fileUrl,
+        publicId: cert.publicId || parsed.publicId,
+        resourceType: cert.resourceType || parsed.resourceType,
+        fileType: cert.fileType || parsed.fileType,
+        ...(derivedOriginalName ? { originalName: derivedOriginalName } : {}),
+      };
+
+      await CertificationModel.updateOne({ _id: docId }, setFields);
+      updatedCount++;
+      details.push({
+        id: String(docId),
+        title: cert.title,
+        status: 'updated',
+        ...setFields,
+      });
+    }
+
+    console.log(
+      `[Migrate Certificates] Examined=${allCerts.length}, Updated=${updatedCount}, Skipped=${skippedCount}`
+    );
+
+    if (updatedCount > 0) {
+      await recordAuditLog({
+        req,
+        action: 'UPDATE',
+        collectionName: 'certifications',
+        targetId: 'migration_batch',
+        targetTitle: `Migrated ${updatedCount} legacy Cloudinary certificates (Skipped ${skippedCount})`,
+        modifiedFields: ['fileUrl', 'publicId', 'resourceType', 'fileType', 'originalName'],
+      });
+    }
+
+    return res.json({
+      success: true,
+      totalExamined: allCerts.length,
+      updatedCount,
+      skippedCount,
+      message: `Migration complete: ${updatedCount} certificate(s) updated, ${skippedCount} skipped.`,
+      details,
+    });
+  } catch (err) {
+    console.error('[Migrate Certificates Error]:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// One-time admin-only BULK UPLOAD migration endpoint that moves OLD certificate files
+// (not yet on Cloudinary) from local public/certificates or external URLs to Cloudinary
+portfolioRouter.post('/admin/bulk-upload-certificates', authenticateAdmin, async (req, res) => {
+  try {
+    const rawDryRun = req.body?.dryRun;
+    const dryRun = rawDryRun === false || rawDryRun === 'false' ? false : true;
+    const rawLimit = req.body?.limit;
+    const parsedLimit =
+      rawLimit !== undefined && rawLimit !== null && String(rawLimit).trim() !== ''
+        ? Number(rawLimit)
+        : null;
+    const hasValidLimit =
+      parsedLimit !== null && Number.isFinite(parsedLimit) && parsedLimit > 0;
+
+    if (!dryRun && !ensureCloudinaryConfigured()) {
+      return res.status(500).json({
+        success: false,
+        error:
+          'Cloudinary is not configured on the server. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in environment variables before running the live upload.',
+      });
+    }
+
+    const allCerts = await CertificationModel.find();
+    let totalChecked = 0;
+    let eligible = 0;
+    let uploaded = 0;
+    let wouldUpload = 0;
+    let skipped = 0;
+    let failed = 0;
+    const results = [];
+
+    for (const cert of allCerts) {
+      totalChecked++;
+      const docId = cert._id || cert.id;
+      const docTitle = cert.title || String(docId || 'Untitled Certificate');
+
+      if (!docId) {
+        skipped++;
+        results.push({
+          _id: '',
+          title: docTitle,
+          oldSource: '',
+          status: 'skipped',
+          reason: 'Document has no _id',
+          newUrl: null,
+        });
+        continue;
+      }
+
+      // 1. Skip documents that already have a non-empty publicId
+      if (cert.publicId && String(cert.publicId).trim() !== '') {
+        skipped++;
+        results.push({
+          _id: String(docId),
+          title: docTitle,
+          oldSource: cert.legacyFileUrl || cert.fileUrl || cert.file || cert.image || '',
+          status: 'skipped',
+          reason: `Already on Cloudinary (publicId: ${cert.publicId})`,
+          newUrl: cert.fileUrl || cert.file || null,
+        });
+        continue;
+      }
+
+      // 2. Find usable old file reference in priority order: fileUrl, file, image, preview, link, credentialUrl
+      const candidateFields = [
+        cert.fileUrl,
+        cert.file,
+        cert.image,
+        cert.preview,
+        cert.link,
+        cert.credentialUrl,
+      ];
+
+      let oldSource = '';
+      let existingCloudinaryUrl = '';
+
+      for (const rawVal of candidateFields) {
+        if (typeof rawVal !== 'string') continue;
+        const val = rawVal.trim();
+        if (!val || val === '#' || val.startsWith('/api/certifications/')) continue;
+        if (parseCloudinaryUrl(val)) {
+          existingCloudinaryUrl = val;
+          break;
+        }
+        if (!oldSource) {
+          oldSource = val;
+        }
+      }
+
+      // Skip documents whose file is already a Cloudinary URL (handled by /api/admin/migrate-certificates)
+      if (existingCloudinaryUrl) {
+        skipped++;
+        results.push({
+          _id: String(docId),
+          title: docTitle,
+          oldSource: existingCloudinaryUrl,
+          status: 'skipped',
+          reason: 'File is already a Cloudinary URL (use Migrate Legacy Cloudinary URLs)',
+          newUrl: existingCloudinaryUrl,
+        });
+        continue;
+      }
+
+      // Skip documents that have no usable file reference
+      if (!oldSource) {
+        skipped++;
+        results.push({
+          _id: String(docId),
+          title: docTitle,
+          oldSource: '',
+          status: 'skipped',
+          reason: 'No usable file reference found in fileUrl, file, image, preview, or link',
+          newUrl: null,
+        });
+        continue;
+      }
+
+      // Enforce optional batch limit on eligible documents
+      if (hasValidLimit && eligible >= parsedLimit) {
+        skipped++;
+        results.push({
+          _id: String(docId),
+          title: docTitle,
+          oldSource,
+          status: 'skipped',
+          reason: `Skipped due to batch limit (${parsedLimit})`,
+          newUrl: null,
+        });
+        continue;
+      }
+
+      // Document is eligible for migration
+      eligible++;
+
+      // 3. Resolve & validate the old file (local path, Google Drive link, or public http/https URL)
+      const resolved = await resolveOldCertificateFile(oldSource, PROJECT_ROOT_DIR);
+      if (!resolved.valid) {
+        if (resolved.failureKind === 'skipped') {
+          skipped++;
+          results.push({
+            _id: String(docId),
+            title: docTitle,
+            oldSource,
+            status: 'skipped',
+            reason: resolved.error || 'Unsupported file type or size limit exceeded',
+            newUrl: null,
+          });
+        } else {
+          failed++;
+          results.push({
+            _id: String(docId),
+            title: docTitle,
+            oldSource,
+            status: 'failed',
+            reason: resolved.error || 'Could not resolve or download old file',
+            newUrl: null,
+          });
+        }
+        continue;
+      }
+
+      // 4. Dry-run mode: report "would-upload" without uploading or modifying MongoDB
+      if (dryRun) {
+        wouldUpload++;
+        results.push({
+          _id: String(docId),
+          title: docTitle,
+          oldSource,
+          status: 'would-upload',
+          reason: `Valid ${resolved.fileType.toUpperCase()} (${(resolved.size / 1024).toFixed(1)} KB, ${resolved.originalName}) ready to upload`,
+          newUrl: null,
+        });
+        continue;
+      }
+
+      // 5. Live run (dryRun === false): upload sequentially to Cloudinary & update MongoDB with $set
+      let uploadedAsset = null;
+      try {
+        uploadedAsset = await uploadBufferToCloudinary(
+          {
+            buffer: resolved.buffer,
+            originalname: resolved.originalName,
+            mimetype: resolved.mimetype,
+            size: resolved.size,
+          },
+          CLOUDINARY_CERTIFICATES_FOLDER
+        );
+
+        const nowIso = new Date().toISOString();
+        const setFields = {
+          fileUrl: uploadedAsset.fileUrl,
+          publicId: uploadedAsset.publicId,
+          resourceType: uploadedAsset.resourceType,
+          fileType: uploadedAsset.fileType,
+          originalName: uploadedAsset.originalName,
+          updatedAt: nowIso,
+        };
+
+        // Preserve original value in legacyFileUrl only if not already set
+        if (!cert.legacyFileUrl) {
+          setFields.legacyFileUrl = oldSource;
+        }
+
+        // Update legacy link fields (file, image, preview, link) ONLY IF they were pointing to the old file
+        for (const legacyField of ['file', 'image', 'preview', 'link']) {
+          if (typeof cert[legacyField] === 'string' && cert[legacyField].trim() === oldSource) {
+            setFields[legacyField] = uploadedAsset.fileUrl;
+          }
+        }
+
+        const updatedDoc = await CertificationModel.updateOne({ _id: docId }, setFields);
+        if (!updatedDoc) {
+          throw new Error('MongoDB updateOne returned no matching document.');
+        }
+
+        uploaded++;
+        results.push({
+          _id: String(docId),
+          title: docTitle,
+          oldSource,
+          status: 'uploaded',
+          reason: `Uploaded ${resolved.fileType.toUpperCase()} (${(resolved.size / 1024).toFixed(1)} KB) to ${uploadedAsset.publicId}`,
+          newUrl: uploadedAsset.fileUrl,
+        });
+      } catch (uploadOrDbErr) {
+        // If DB update failed after Cloudinary upload, delete the just-uploaded Cloudinary file (no orphans)
+        if (uploadedAsset?.publicId) {
+          await deleteFromCloudinary(uploadedAsset.publicId, uploadedAsset.resourceType).catch(() => {});
+        }
+        failed++;
+        results.push({
+          _id: String(docId),
+          title: docTitle,
+          oldSource,
+          status: 'failed',
+          reason: uploadOrDbErr.message || 'Upload or database update failed',
+          newUrl: null,
+        });
+      }
+
+      // Small sequential delay to avoid Cloudinary / network rate limits
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    }
+
+    console.log(
+      `[Bulk Upload Certificates] dryRun=${dryRun}, totalChecked=${totalChecked}, eligible=${eligible}, uploaded=${uploaded}, wouldUpload=${wouldUpload}, skipped=${skipped}, failed=${failed}`
+    );
+
+    if (!dryRun && uploaded > 0) {
+      await recordAuditLog({
+        req,
+        action: 'UPDATE',
+        collectionName: 'certifications',
+        targetId: 'bulk_upload_certificates',
+        targetTitle: `Bulk uploaded ${uploaded} old certificate(s) to Cloudinary (Skipped: ${skipped}, Failed: ${failed})`,
+        modifiedFields: ['fileUrl', 'publicId', 'resourceType', 'fileType', 'originalName', 'legacyFileUrl'],
+      });
+    }
+
+    return res.json({
+      success: true,
+      dryRun,
+      totalChecked,
+      eligible,
+      uploaded,
+      wouldUpload,
+      skipped,
+      failed,
+      results,
+      documents: results,
+    });
+  } catch (err) {
+    console.error('[Bulk Upload Certificates Error]:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1216,6 +1798,189 @@ portfolioRouter.put('/profile', authenticateAdmin, async (req, res) => {
     res.json({ success: true, data: updated, message: 'Profile updated in MongoDB' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// 6B. RESUME MANAGEMENT (Single Active Item: Public Read | Admin Add/Replace/Delete via Cloudinary)
+// ==========================================
+
+portfolioRouter.get('/resume', async (_req, res) => {
+  try {
+    const profile = await ProfileModel.get();
+    const resumeData = profile?.resume || {
+      fileUrl: profile?.resumeUrl || '',
+      publicId: profile?.resumePublicId || '',
+      resourceType: profile?.resumeResourceType || '',
+      fileType: profile?.resumeFileType || (String(profile?.resumeUrl || '').toLowerCase().endsWith('.pdf') ? 'pdf' : ''),
+      originalName: profile?.resumeOriginalName || '',
+      createdAt: profile?.createdAt || null,
+      updatedAt: profile?.updatedAt || null,
+    };
+    return res.json({
+      success: true,
+      data: resumeData,
+      resumeUrl: resumeData.fileUrl || profile?.resumeUrl || '',
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+const handleSaveOrReplaceResume = async (req, res) => {
+  let uploadedAsset = null;
+  try {
+    const existingProfile = await ProfileModel.get();
+    const nowIso = new Date().toISOString();
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select a valid Resume file (PDF, JPG, JPEG, PNG, or WEBP) to upload.',
+      });
+    }
+
+    // 1. Upload the new resume to Cloudinary folder "portfolio/resume" FIRST
+    uploadedAsset = await uploadBufferToCloudinary(req.file, CLOUDINARY_RESUME_FOLDER);
+
+    const resumeMetadata = {
+      fileUrl: uploadedAsset.fileUrl,
+      publicId: uploadedAsset.publicId,
+      resourceType: uploadedAsset.resourceType,
+      fileType: uploadedAsset.fileType,
+      originalName: uploadedAsset.originalName,
+      createdAt: existingProfile?.resume?.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+
+    // 2. Save the new resume link and metadata in the database
+    const updatedProfile = await ProfileModel.update({
+      resumeUrl: uploadedAsset.fileUrl,
+      resume: resumeMetadata,
+      fileUrl: uploadedAsset.fileUrl,
+      publicId: uploadedAsset.publicId,
+      resourceType: uploadedAsset.resourceType,
+      fileType: uploadedAsset.fileType,
+      originalName: uploadedAsset.originalName,
+      authorUid: req.user?.username || 'admin',
+      updatedAt: nowIso,
+    });
+
+    // 3. Delete the old Cloudinary resume file if one existed previously
+    const oldResume = existingProfile?.resume;
+    let oldPublicId = oldResume?.publicId || existingProfile?.publicId || '';
+    let oldResourceType =
+      oldResume?.resourceType ||
+      existingProfile?.resourceType ||
+      (oldResume?.fileType === 'pdf' ? 'raw' : 'image');
+
+    if (!oldPublicId) {
+      const oldUrlCandidate = oldResume?.fileUrl || existingProfile?.resumeUrl || '';
+      const parsedOld = parseCloudinaryUrl(oldUrlCandidate);
+      if (parsedOld) {
+        oldPublicId = parsedOld.publicId;
+        oldResourceType = parsedOld.resourceType;
+      }
+    }
+
+    if (oldPublicId && oldPublicId !== uploadedAsset.publicId) {
+      await deleteFromCloudinary(oldPublicId, oldResourceType);
+    }
+
+    await recordAuditLog({
+      req,
+      action: existingProfile?.resumeUrl ? 'UPDATE' : 'CREATE',
+      collectionName: 'profile',
+      targetId: 'resume',
+      targetTitle: `Official Resume (${uploadedAsset.originalName})`,
+      before: existingProfile?.resume || { resumeUrl: existingProfile?.resumeUrl },
+      after: resumeMetadata,
+      modifiedFields: ['resumeUrl', 'resume'],
+    });
+
+    return res.json({
+      success: true,
+      message: 'Resume uploaded to Cloudinary and saved to MongoDB!',
+      data: updatedProfile,
+      resume: resumeMetadata,
+    });
+  } catch (err) {
+    // Avoid orphan files if DB save fails after upload
+    if (uploadedAsset?.publicId) {
+      await deleteFromCloudinary(uploadedAsset.publicId, uploadedAsset.resourceType).catch(() => {});
+    }
+    const status = err.statusCode || 500;
+    return res.status(status).json({ success: false, error: err.message });
+  }
+};
+
+portfolioRouter.post('/resume', authenticateAdmin, handleMultipartFile, handleSaveOrReplaceResume);
+portfolioRouter.put('/resume', authenticateAdmin, handleMultipartFile, handleSaveOrReplaceResume);
+
+portfolioRouter.delete('/resume', authenticateAdmin, async (req, res) => {
+  try {
+    const existingProfile = await ProfileModel.get();
+    const oldResume = existingProfile?.resume;
+
+    let oldPublicId = oldResume?.publicId || existingProfile?.publicId || '';
+    let oldResourceType =
+      oldResume?.resourceType ||
+      existingProfile?.resourceType ||
+      (oldResume?.fileType === 'pdf' ? 'raw' : 'image');
+
+    let cloudinaryDeleted = false;
+    let cloudinaryNotice = null;
+
+    if (!oldPublicId) {
+      const oldUrlCandidate = oldResume?.fileUrl || existingProfile?.resumeUrl || '';
+      const parsedOld = parseCloudinaryUrl(oldUrlCandidate);
+      if (parsedOld) {
+        oldPublicId = parsedOld.publicId;
+        oldResourceType = parsedOld.resourceType;
+      } else if (oldUrlCandidate) {
+        cloudinaryNotice =
+          'Resume record cleared in database. The previous resume link was not a Cloudinary URL, so no Cloudinary file was deleted.';
+      }
+    }
+
+    if (oldPublicId) {
+      const delRes = await deleteFromCloudinary(oldPublicId, oldResourceType);
+      cloudinaryDeleted = Boolean(delRes.deleted);
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedProfile = await ProfileModel.update({
+      resumeUrl: '',
+      resume: null,
+      fileUrl: '',
+      publicId: '',
+      resourceType: '',
+      fileType: '',
+      originalName: '',
+      authorUid: req.user?.username || 'admin',
+      updatedAt: nowIso,
+    });
+
+    await recordAuditLog({
+      req,
+      action: 'DELETE',
+      collectionName: 'profile',
+      targetId: 'resume',
+      targetTitle: `Official Resume (${oldResume?.originalName || 'Active Resume'})`,
+      before: oldResume || { resumeUrl: existingProfile?.resumeUrl },
+      after: null,
+      modifiedFields: ['resumeUrl', 'resume'],
+    });
+
+    return res.json({
+      success: true,
+      cloudinaryDeleted,
+      notice: cloudinaryNotice,
+      data: updatedProfile,
+      message: cloudinaryNotice || 'Resume removed from Cloudinary and cleared in MongoDB.',
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

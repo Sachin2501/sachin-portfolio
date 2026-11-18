@@ -91,6 +91,7 @@ export const MongoInspectorTab = ({
     apiStats?.serverUptimeSeconds || backendHealth?.serverUptimeSeconds || 0
   );
   const isMountedRef = useRef(true);
+  const pingSeqRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -209,11 +210,12 @@ export const MongoInspectorTab = ({
       setTickingUptime(serverUptime);
 
       setLivePortfolioPing((prev) => {
+        pingSeqRef.current += 1;
         const prevHistory = Array.isArray(prev.latencyHistory) ? prev.latencyHistory : [];
         const nextHistory = [
           ...prevHistory.slice(-11),
           {
-            id: Date.now(),
+            id: `${Date.now()}-${pingSeqRef.current}`,
             latencyMs,
             ok: isOk,
             state: healthState,
@@ -273,29 +275,32 @@ export const MongoInspectorTab = ({
       const latencyMs = Math.max(1, Math.round(performance.now() - startTime));
       const checkedTimeStr = new Date().toLocaleTimeString();
 
-      setLivePortfolioPing((prev) => ({
-        ...prev,
-        state: 'offline',
-        ok: false,
-        httpStatus: 0,
-        statusText: 'OFFLINE',
-        latencyMs,
-        latencyHistory: [
-          ...(Array.isArray(prev.latencyHistory) ? prev.latencyHistory : []).slice(-11),
-          {
-            id: Date.now(),
-            latencyMs,
-            ok: false,
-            state: 'offline',
-            status: 'ERR',
-            time: checkedTimeStr,
-          },
-        ],
-        lastCheckedAt: checkedTimeStr,
-        pingCount: (prev.pingCount || 0) + 1,
-        isPinging: false,
-        error: err.message || 'Network request failed',
-      }));
+      setLivePortfolioPing((prev) => {
+        pingSeqRef.current += 1;
+        return {
+          ...prev,
+          state: 'offline',
+          ok: false,
+          httpStatus: 0,
+          statusText: 'OFFLINE',
+          latencyMs,
+          latencyHistory: [
+            ...(Array.isArray(prev.latencyHistory) ? prev.latencyHistory : []).slice(-11),
+            {
+              id: `${Date.now()}-${pingSeqRef.current}`,
+              latencyMs,
+              ok: false,
+              state: 'offline',
+              status: 'ERR',
+              time: checkedTimeStr,
+            },
+          ],
+          lastCheckedAt: checkedTimeStr,
+          pingCount: (prev.pingCount || 0) + 1,
+          isPinging: false,
+          error: err.message || 'Network request failed',
+        };
+      });
 
       setEndpointResults((prev) => ({
         ...prev,
@@ -788,8 +793,8 @@ export const MongoInspectorTab = ({
             <div className="hb-sparkline-bars" role="img" aria-label="Recent /api/portfolio latency measurements">
               {(activePing.latencyHistory.length > 0
                 ? activePing.latencyHistory
-                : [{ id: 0, latencyMs: 12, ok: true, state: 'online', time: 'Init' }]
-              ).map((sample) => {
+                : [{ id: 'init-0', latencyMs: 12, ok: true, state: 'online', time: 'Init' }]
+              ).map((sample, idx) => {
                 const maxBar = Math.max(120, activePing.maxLatencyMs || 120);
                 const heightPct = Math.min(
                   100,
@@ -797,7 +802,7 @@ export const MongoInspectorTab = ({
                 );
                 return (
                   <div
-                    key={sample.id}
+                    key={`${sample.id ?? 'ping'}-${idx}`}
                     className={`hb-sparkline-bar-wrap`}
                     title={`${sample.time}: ${sample.latencyMs}ms (${sample.status || '200 OK'})`}
                   >

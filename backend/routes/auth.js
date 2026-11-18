@@ -40,89 +40,12 @@ export function verifyPassword(inputPassword, user) {
   return false;
 }
 
-// 1. REGISTER NEW ADMIN USER (Stored in MongoDB)
-authRouter.post('/register', async (req, res) => {
-  try {
-    const { username, email, password, fullName } = req.body || {};
-
-    if (!username || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username, email, and password are all required.',
-      });
-    }
-
-    const cleanUsername = String(username).trim().toLowerCase();
-    const cleanEmail = String(email).trim().toLowerCase();
-
-    if (cleanUsername.length < 3) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username must be at least 3 characters long.',
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'Password must be at least 6 characters long.',
-      });
-    }
-
-    // Check if user already exists
-    const allUsers = await UserModel.find();
-    const existingUser = allUsers.find(
-      (u) =>
-        (u.username && u.username.toLowerCase() === cleanUsername) ||
-        (u.email && u.email.toLowerCase() === cleanEmail)
-    );
-
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        error: 'An account with this username or email already exists. Please log in.',
-      });
-    }
-
-    // Generate random salt and hash password with SHA-256
-    const salt = generateSalt();
-    const passwordHash = hashPassword(password, salt);
-
-    const newUser = await UserModel.create({
-      username: cleanUsername,
-      email: cleanEmail,
-      name: fullName || cleanUsername,
-      role: 'admin',
-      passwordSalt: salt,
-      passwordHash,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    const safeUser = {
-      id: newUser.id || newUser._id,
-      username: newUser.username,
-      email: newUser.email,
-      name: newUser.name,
-      role: newUser.role,
-    };
-
-    // Issue RFC 7519 signed JWT token
-    const token = createJWT(safeUser);
-
-    return res.status(201).json({
-      success: true,
-      message: `Account created successfully! Welcome, ${safeUser.name}.`,
-      token,
-      user: safeUser,
-    });
-  } catch (err) {
-    console.error('[Auth Register Error]:', err);
-    return res.status(500).json({
-      success: false,
-      error: `Registration error: ${err.message}`,
-    });
-  }
+// 1. REGISTER DISABLED (Single Admin Only Rule)
+authRouter.post('/register', async (_req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Admin registration is disabled. Only one admin account is allowed.',
+  });
 });
 
 // 2. LOGIN WITH USERNAME OR EMAIL AND PASSWORD (Verified in MongoDB)

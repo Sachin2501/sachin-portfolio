@@ -14,6 +14,7 @@ export const CertificationModel = {
   find: (query = {}) => db.certifications.find(query),
   findById: (id) => db.certifications.findById(id),
   create: (doc) => db.certifications.create(doc),
+  updateOne: (filter, updates) => db.certifications.updateOne(filter, updates),
   findByIdAndUpdate: (id, updates) => db.certifications.findByIdAndUpdate(id, updates),
   findByIdAndDelete: (id) => db.certifications.findByIdAndDelete(id),
   deleteMany: (query = {}) => db.certifications.deleteMany(query),

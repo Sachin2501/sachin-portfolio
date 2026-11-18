@@ -227,12 +227,21 @@ const deriveCertPreviewFromPdf = (pdfPath) => {
 
 const normalizeCertificationItem = (c) => {
   if (!c) return c;
-  const pdfDoc = [c.file, c.image, c.preview, c.link].find((v) => isPdfUrl(v)) || '';
+  const rawFileUrl = typeof c.fileUrl === 'string' && c.fileUrl.trim() ? c.fileUrl.trim() : '';
+  const isExplicitPdf =
+    c.fileType === 'pdf' || c.resourceType === 'raw' || isPdfUrl(rawFileUrl);
+  const pdfDoc =
+    (isExplicitPdf && rawFileUrl) ||
+    [rawFileUrl, c.file, c.image, c.preview, c.link].find((v) => isPdfUrl(v)) ||
+    '';
   const explicitImgPreview =
-    [c.preview, c.image, c.file].find((v) => typeof v === 'string' && v.trim() && !isPdfUrl(v)) || '';
+    (!isExplicitPdf && rawFileUrl) ||
+    [c.preview, c.image, c.file].find((v) => typeof v === 'string' && v.trim() && !isPdfUrl(v)) ||
+    '';
   const derivedPreview = !explicitImgPreview && pdfDoc ? deriveCertPreviewFromPdf(pdfDoc) : '';
   const imgPreview = explicitImgPreview || derivedPreview;
   const fallbackDoc =
+    rawFileUrl ||
     imgPreview ||
     pdfDoc ||
     c.file ||
@@ -243,13 +252,19 @@ const normalizeCertificationItem = (c) => {
     ...c,
     id: c.id ?? c._id,
     _id: c._id ?? c.id,
+    description: c.description || '',
     category: c.category || 'web',
     categoryLabel: c.categoryLabel || 'Professional Certification',
+    fileUrl: rawFileUrl || '',
+    publicId: c.publicId || '',
+    resourceType: c.resourceType || '',
+    fileType: c.fileType || (pdfDoc ? 'pdf' : imgPreview ? 'image' : ''),
+    originalName: c.originalName || '',
     image: imgPreview || (pdfDoc ? '' : fallbackDoc),
     preview: imgPreview || (pdfDoc ? '' : fallbackDoc),
-    file: pdfDoc || c.file || imgPreview || fallbackDoc,
-    link: c.link || c.verifyUrl || pdfDoc || c.file || '#',
-    verifyUrl: c.verifyUrl || c.link || pdfDoc || c.file || '#',
+    file: rawFileUrl || pdfDoc || c.file || imgPreview || fallbackDoc,
+    link: c.link || c.verifyUrl || rawFileUrl || pdfDoc || c.file || '#',
+    verifyUrl: c.verifyUrl || c.link || rawFileUrl || pdfDoc || c.file || '#',
   };
 };
 
@@ -477,8 +492,9 @@ export const PortfolioProvider = ({ children }) => {
       const targetUrl = buildApiUrl(url);
       await ensureValidAdminToken(false);
       const isDelete = options.method === 'DELETE';
+      const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
       const firstHeaders = {
-        ...(isDelete ? getDeleteHeaders() : getAuthHeaders()),
+        ...(isDelete || isFormData ? getDeleteHeaders() : getAuthHeaders()),
         ...(options.headers || {}),
       };
       let res;
@@ -1811,21 +1827,25 @@ export const PortfolioProvider = ({ children }) => {
     const strId = String(id);
     unmarkClientDeleted(strId, cert);
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
-    const rawDoc = cert.file || cert.image || cert.preview || '';
+    const rawFileObj = cert.rawFile || null;
+    const cleanCert = { ...cert };
+    delete cleanCert.rawFile;
+
+    const rawDoc = cleanCert.file || cleanCert.image || cleanCert.preview || '';
     const isPdf = typeof rawDoc === 'string' && rawDoc.startsWith('data:application/pdf');
     const isDataImg = typeof rawDoc === 'string' && rawDoc.startsWith('data:image/');
     const explicitPreview =
-      typeof cert.preview === 'string' && !cert.preview.startsWith('data:application/pdf')
-        ? cert.preview
-        : typeof cert.image === 'string' && !cert.image.startsWith('data:application/pdf')
-        ? cert.image
+      typeof cleanCert.preview === 'string' && !cleanCert.preview.startsWith('data:application/pdf')
+        ? cleanCert.preview
+        : typeof cleanCert.image === 'string' && !cleanCert.image.startsWith('data:application/pdf')
+        ? cleanCert.image
         : '';
 
     const wirePayload = {
-      ...cert,
+      ...cleanCert,
       id,
       _id: id,
-      file: isPdf ? rawDoc : cert.file || rawDoc,
+      file: isPdf ? rawDoc : cleanCert.file || rawDoc,
       image: explicitPreview || (isDataImg ? rawDoc : ''),
       preview: explicitPreview || (isDataImg ? rawDoc : ''),
       authorUid,
@@ -1833,15 +1853,40 @@ export const PortfolioProvider = ({ children }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const optimisticCert = normalizeCertificationItem({ ...cert, ...wirePayload });
+    const optimisticCert = normalizeCertificationItem({ ...cleanCert, ...wirePayload });
     setCertificationsList((prev) => [
       optimisticCert,
       ...prev.filter((c) => String(c.id ?? c._id) !== strId),
     ]);
 
+    let requestBody;
+    if (rawFileObj && typeof FormData !== 'undefined') {
+      const formData = new FormData();
+      formData.append('file', rawFileObj);
+      formData.append('id', id);
+      formData.append('title', wirePayload.title || '');
+      formData.append('issuer', wirePayload.issuer || '');
+      formData.append('date', wirePayload.date || '');
+      formData.append('description', wirePayload.description || '');
+      formData.append('category', wirePayload.category || 'web');
+      formData.append('categoryLabel', wirePayload.categoryLabel || '');
+      formData.append('credentialId', wirePayload.credentialId || '');
+      formData.append(
+        'skills',
+        Array.isArray(wirePayload.skills) ? wirePayload.skills.join(', ') : wirePayload.skills || ''
+      );
+      if (wirePayload.link) formData.append('link', wirePayload.link);
+      if (wirePayload.preview && !wirePayload.preview.startsWith('data:application/pdf')) {
+        formData.append('preview', wirePayload.preview);
+      }
+      requestBody = formData;
+    } else {
+      requestBody = JSON.stringify(wirePayload);
+    }
+
     const res = await adminFetch(buildApiUrl('/api/certifications'), {
       method: 'POST',
-      body: JSON.stringify(wirePayload),
+      body: requestBody,
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
@@ -1850,7 +1895,7 @@ export const PortfolioProvider = ({ children }) => {
     }
 
     mutationVersionRef.current += 1;
-    const savedData = normalizeCertificationItem({ ...cert, ...wirePayload, ...(json.data || {}) });
+    const savedData = normalizeCertificationItem({ ...cleanCert, ...wirePayload, ...(json.data || {}) });
     setCertificationsList((prev) => [
       savedData,
       ...prev.filter((c) => String(c.id ?? c._id) !== strId && String(c.id ?? c._id) !== String(savedData.id)),
@@ -1859,7 +1904,7 @@ export const PortfolioProvider = ({ children }) => {
     refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
-    return savedData.id || id;
+    return savedData;
   }, [isAdmin, dbUser, adminFetch, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const updateCertification = useCallback(async (id, updates) => {
@@ -1869,21 +1914,25 @@ export const PortfolioProvider = ({ children }) => {
     mutationVersionRef.current += 1;
     const strId = String(id).trim();
     const authorUid = dbUser?.username || auth.currentUser?.uid || 'admin_sachin';
-    const rawDoc = updates.file || updates.image || updates.preview || '';
+    const rawFileObj = updates.rawFile || null;
+    const cleanUpdates = { ...updates };
+    delete cleanUpdates.rawFile;
+
+    const rawDoc = cleanUpdates.file || cleanUpdates.image || cleanUpdates.preview || '';
     const isPdf = typeof rawDoc === 'string' && rawDoc.startsWith('data:application/pdf');
     const isDataImg = typeof rawDoc === 'string' && rawDoc.startsWith('data:image/');
     const explicitPreview =
-      typeof updates.preview === 'string' && !updates.preview.startsWith('data:application/pdf')
-        ? updates.preview
-        : typeof updates.image === 'string' && !updates.image.startsWith('data:application/pdf')
-        ? updates.image
+      typeof cleanUpdates.preview === 'string' && !cleanUpdates.preview.startsWith('data:application/pdf')
+        ? cleanUpdates.preview
+        : typeof cleanUpdates.image === 'string' && !cleanUpdates.image.startsWith('data:application/pdf')
+        ? cleanUpdates.image
         : '';
 
     const payload = {
-      ...updates,
+      ...cleanUpdates,
       ...(rawDoc
         ? {
-            file: isPdf ? rawDoc : updates.file || rawDoc,
+            file: isPdf ? rawDoc : cleanUpdates.file || rawDoc,
             image: explicitPreview || (isDataImg ? rawDoc : ''),
             preview: explicitPreview || (isDataImg ? rawDoc : ''),
           }
@@ -1895,14 +1944,40 @@ export const PortfolioProvider = ({ children }) => {
     setCertificationsList((prev) =>
       prev.map((c) =>
         String(c.id ?? c._id) === strId || String(c._id ?? c.id) === strId
-          ? normalizeCertificationItem({ ...c, ...updates, ...payload })
+          ? normalizeCertificationItem({ ...c, ...cleanUpdates, ...payload })
           : c
       )
     );
 
+    let requestBody;
+    if (rawFileObj && typeof FormData !== 'undefined') {
+      const formData = new FormData();
+      formData.append('file', rawFileObj);
+      if (payload.title !== undefined) formData.append('title', payload.title);
+      if (payload.issuer !== undefined) formData.append('issuer', payload.issuer);
+      if (payload.date !== undefined) formData.append('date', payload.date);
+      if (payload.description !== undefined) formData.append('description', payload.description);
+      if (payload.category !== undefined) formData.append('category', payload.category);
+      if (payload.categoryLabel !== undefined) formData.append('categoryLabel', payload.categoryLabel);
+      if (payload.credentialId !== undefined) formData.append('credentialId', payload.credentialId);
+      if (payload.skills !== undefined) {
+        formData.append(
+          'skills',
+          Array.isArray(payload.skills) ? payload.skills.join(', ') : payload.skills || ''
+        );
+      }
+      if (payload.link !== undefined) formData.append('link', payload.link);
+      if (payload.preview && !payload.preview.startsWith('data:application/pdf')) {
+        formData.append('preview', payload.preview);
+      }
+      requestBody = formData;
+    } else {
+      requestBody = JSON.stringify(payload);
+    }
+
     const res = await adminFetch(buildApiUrl(`/api/certifications/${encodeURIComponent(strId)}`), {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: requestBody,
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
@@ -1914,7 +1989,7 @@ export const PortfolioProvider = ({ children }) => {
     setCertificationsList((prev) =>
       prev.map((c) =>
         String(c.id ?? c._id) === strId || String(c._id ?? c.id) === strId
-          ? normalizeCertificationItem({ ...c, ...updates, ...payload, ...(json.data || {}) })
+          ? normalizeCertificationItem({ ...c, ...cleanUpdates, ...payload, ...(json.data || {}) })
           : c
       )
     );
@@ -1922,7 +1997,7 @@ export const PortfolioProvider = ({ children }) => {
     refreshPortfolioData(false);
     fetchAuditLogs();
     fetchAuditStats();
-    return true;
+    return json.data || true;
   }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
   const deleteCertification = useCallback(async (idOrCert) => {
@@ -1982,8 +2057,53 @@ export const PortfolioProvider = ({ children }) => {
     refreshPortfolioData();
     fetchAuditLogs();
     fetchAuditStats();
-    return true;
+    return json;
   }, [isAdmin, adminFetch, certificationsList, markClientDeleted, unmarkClientDeleted, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+
+  const migrateCertificates = useCallback(async () => {
+    if (!isAdmin) {
+      throw new Error('Admin Login required! Please Sign In first to migrate certificates.');
+    }
+    const res = await adminFetch(buildApiUrl('/api/admin/migrate-certificates'), {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error || 'Failed to migrate certificates.');
+    }
+    await refreshPortfolioData(true);
+    fetchAuditLogs();
+    fetchAuditStats();
+    return json;
+  }, [isAdmin, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+
+  const bulkUploadCertificates = useCallback(
+    async ({ dryRun = true, limit } = {}) => {
+      if (!isAdmin) {
+        throw new Error('Admin Login required! Please Sign In first to bulk upload certificates.');
+      }
+      const payload = { dryRun: dryRun !== false };
+      if (limit !== undefined && limit !== null && String(limit).trim() !== '') {
+        payload.limit = Number(limit);
+      }
+      const res = await adminFetch(buildApiUrl('/api/admin/bulk-upload-certificates'), {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.success === false) {
+        throw new Error(json.error || 'Failed to run bulk upload for old certificates.');
+      }
+      if (payload.dryRun === false) {
+        await refreshPortfolioData(true);
+        fetchAuditLogs();
+        fetchAuditStats();
+      }
+      return json;
+    },
+    [isAdmin, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]
+  );
 
   // 3. EDUCATION
   const addEducation = useCallback(async (edu) => {
@@ -2474,6 +2594,70 @@ export const PortfolioProvider = ({ children }) => {
     return true;
   }, [isAdmin, dbUser, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
 
+  // Upload or Replace Single Active Resume via Cloudinary
+  const uploadResume = useCallback(async (file) => {
+    if (!isAdmin) {
+      throw new Error('Admin Login required! Please Sign In first to upload or replace the resume.');
+    }
+    if (!file) {
+      throw new Error('Please select a Resume file (PDF or Image) to upload.');
+    }
+    mutationVersionRef.current += 1;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await adminFetch(buildApiUrl('/api/resume'), {
+      method: 'POST',
+      body: formData,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error || 'Failed to upload resume to Cloudinary.');
+    }
+
+    mutationVersionRef.current += 1;
+    if (json.data) {
+      setProfileConfig((prev) => ({ ...prev, ...json.data }));
+    }
+    notifyRealtimeUpdate('profile');
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
+    return json;
+  }, [isAdmin, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+
+  // Delete Active Resume from Cloudinary and Clear Record
+  const deleteResume = useCallback(async () => {
+    if (!isAdmin) {
+      throw new Error('Admin Login required! Please Sign In first to delete the resume.');
+    }
+    mutationVersionRef.current += 1;
+    const res = await adminFetch(buildApiUrl('/api/resume'), {
+      method: 'DELETE',
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error || 'Failed to delete resume.');
+    }
+
+    mutationVersionRef.current += 1;
+    setProfileConfig((prev) => ({
+      ...prev,
+      resumeUrl: '',
+      resume: null,
+      fileUrl: '',
+      publicId: '',
+      resourceType: '',
+      fileType: '',
+      originalName: '',
+    }));
+    notifyRealtimeUpdate('profile');
+    refreshPortfolioData();
+    fetchAuditLogs();
+    fetchAuditStats();
+    return json;
+  }, [isAdmin, adminFetch, refreshPortfolioData, fetchAuditLogs, fetchAuditStats]);
+
   // Seed / Sync Initial Portfolio to MongoDB (only refreshes from live database without overwriting existing records)
   const seedInitialData = useCallback(async () => {
     if (!isAdmin) {
@@ -2678,6 +2862,8 @@ export const PortfolioProvider = ({ children }) => {
     addCertification,
     updateCertification,
     deleteCertification,
+    migrateCertificates,
+    bulkUploadCertificates,
     addEducation,
     updateEducation,
     deleteEducation,
@@ -2688,6 +2874,8 @@ export const PortfolioProvider = ({ children }) => {
     updateSkill,
     deleteSkill,
     updateProfilePhotos,
+    uploadResume,
+    deleteResume,
     seedInitialData,
     submitContactMessage,
     fetchContactMessages,

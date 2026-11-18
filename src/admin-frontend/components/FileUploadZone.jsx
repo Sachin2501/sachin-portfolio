@@ -69,22 +69,33 @@ export const FileUploadZone = ({
 
     setErrorMsg(null);
 
-    // Size limit check (20MB)
-    const maxSizeBytes = 20 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      setErrorMsg('File exceeds 20MB limit. Please choose a smaller file.');
-      return;
-    }
-
-    const isImageFile = file.type.startsWith('image/');
-    const isPdfFile = file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+    const fileName = String(file.name || '').toLowerCase();
+    const allowedImageExts = ['.jpg', '.jpeg', '.png', '.webp'];
+    const allowedImageMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const isImageFile =
+      allowedImageMimes.includes(file.type) ||
+      allowedImageExts.some((ext) => fileName.endsWith(ext));
+    const isPdfFile =
+      file.type === 'application/pdf' || fileName.endsWith('.pdf');
 
     if (!isImageFile && !(allowPdf && isPdfFile)) {
       setErrorMsg(
         allowPdf
-          ? 'Only image files (JPG, PNG, WebP) or PDF files are allowed.'
-          : 'Only image files (JPG, PNG, WebP) are allowed.'
+          ? 'Invalid file type. Only PDF, JPG, JPEG, PNG, and WEBP files are allowed.'
+          : 'Invalid file type. Only JPG, JPEG, PNG, and WEBP image files are allowed.'
       );
+      return;
+    }
+
+    // Strict size limits: 5 MB for images, 10 MB for PDFs
+    const maxImageBytes = 5 * 1024 * 1024;
+    const maxPdfBytes = 10 * 1024 * 1024;
+    if (isImageFile && file.size > maxImageBytes) {
+      setErrorMsg('Image file exceeds the 5 MB maximum limit. Please choose an image under 5 MB.');
+      return;
+    }
+    if (isPdfFile && file.size > maxPdfBytes) {
+      setErrorMsg('PDF file exceeds the 10 MB maximum limit. Please choose a PDF under 10 MB.');
       return;
     }
 
@@ -94,7 +105,7 @@ export const FileUploadZone = ({
     reader.onload = (e) => {
       const base64Result = e.target.result;
 
-      // Compress large images (> 350KB) automatically for instant database save
+      // Compress large images (> 350KB) automatically for instant preview while preserving rawFile for Cloudinary
       if (isImageFile && file.size > 350 * 1024 && typeof base64Result === 'string') {
         const img = new window.Image();
         img.onload = () => {
@@ -121,8 +132,9 @@ export const FileUploadZone = ({
             if (onChange) {
               onChange(compressed, {
                 name: file.name,
-                size: Math.round((compressed.length * 3) / 4),
-                type: 'image/jpeg',
+                size: file.size,
+                type: file.type || 'image/jpeg',
+                rawFile: file,
               });
             }
           } catch {
@@ -132,6 +144,7 @@ export const FileUploadZone = ({
                 name: file.name,
                 size: file.size,
                 type: file.type || 'image/png',
+                rawFile: file,
               });
             }
           }
@@ -143,6 +156,7 @@ export const FileUploadZone = ({
               name: file.name,
               size: file.size,
               type: file.type || 'image/png',
+              rawFile: file,
             });
           }
         };
@@ -158,6 +172,7 @@ export const FileUploadZone = ({
             name: file.name,
             size: file.size,
             type: file.type || 'application/pdf',
+            rawFile: file,
           });
         }
         renderPdfFirstPageToPng(base64Result)
@@ -168,6 +183,7 @@ export const FileUploadZone = ({
                 size: file.size,
                 type: file.type || 'application/pdf',
                 previewDataUrl,
+                rawFile: file,
               });
             }
           })
@@ -179,6 +195,7 @@ export const FileUploadZone = ({
           name: file.name,
           size: file.size,
           type: file.type || 'image/png',
+          rawFile: file,
         });
       }
     };

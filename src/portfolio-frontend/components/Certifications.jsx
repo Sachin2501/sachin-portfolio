@@ -11,21 +11,22 @@ export const Certifications = ({ onSelectCertificate }) => {
 
   const warmCertAssets = useCallback((cert, includePdf = false) => {
     if (!cert) return;
-    const imgUrl = cert.preview || cert.image || cert.file;
-    if (imgUrl && !String(imgUrl).toLowerCase().includes('.pdf')) {
+    const primaryUrl = cert.fileUrl || cert.file || '';
+    const imgUrl = cert.preview || cert.image || (cert.fileType === 'image' ? cert.fileUrl : '') || cert.file;
+    if (imgUrl && !String(imgUrl).toLowerCase().includes('.pdf') && cert.fileType !== 'pdf') {
       preloadCertificateImage(imgUrl).catch(() => {});
     } else if (
-      cert.file &&
-      String(cert.file).startsWith('/certificates/') &&
-      String(cert.file).toLowerCase().endsWith('.pdf')
+      primaryUrl &&
+      String(primaryUrl).startsWith('/certificates/') &&
+      String(primaryUrl).toLowerCase().endsWith('.pdf')
     ) {
-      const base = String(cert.file).replace(/^\/certificates\//, '').replace(/\.pdf$/i, '');
+      const base = String(primaryUrl).replace(/^\/certificates\//, '').replace(/\.pdf$/i, '');
       if (base) {
         preloadCertificateImage(`/certificates/previews/${base}.png`).catch(() => {});
       }
     }
-    if (includePdf && cert.file && String(cert.file).toLowerCase().includes('.pdf')) {
-      preloadPdfDocument(cert.file).catch(() => {});
+    if (includePdf && primaryUrl && (String(primaryUrl).toLowerCase().includes('.pdf') || cert.fileType === 'pdf')) {
+      preloadPdfDocument(primaryUrl).catch(() => {});
     }
   }, []);
 

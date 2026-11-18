@@ -8,18 +8,26 @@ export const ResumeModal = ({ isOpen, onClose }) => {
   const [viewMode, setViewMode] = useState('pdf'); // Default to 'pdf' so all resume pages are visible
   const [imgError, setImgError] = useState(false);
 
-  const customResumeUrl = profileConfig?.resumeUrl;
+  const customResumeUrl =
+    profileConfig?.resume?.fileUrl ||
+    profileConfig?.fileUrl ||
+    profileConfig?.resumeUrl;
+  const isCustomPdf =
+    profileConfig?.resume?.fileType === 'pdf' ||
+    profileConfig?.fileType === 'pdf' ||
+    (customResumeUrl &&
+      (customResumeUrl.toLowerCase().endsWith('.pdf') ||
+        customResumeUrl.toLowerCase().includes('.pdf?') ||
+        customResumeUrl.startsWith('data:application/pdf')));
+
   const resumePdfPath =
-    customResumeUrl &&
-    (customResumeUrl.toLowerCase().endsWith('.pdf') ||
-      customResumeUrl.startsWith('data:application/pdf'))
+    customResumeUrl && isCustomPdf
       ? customResumeUrl
       : '/certificates/resume.pdf';
 
   const resumePreviewPath =
     customResumeUrl &&
-    !customResumeUrl.toLowerCase().endsWith('.pdf') &&
-    !customResumeUrl.startsWith('data:application/pdf') &&
+    !isCustomPdf &&
     customResumeUrl !== '/sachin_kumar_cv.pdf'
       ? customResumeUrl
       : '/certificates/previews/resume.png';

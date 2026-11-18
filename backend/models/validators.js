@@ -136,6 +136,7 @@ export const validateCertification = (data = {}, isUpdate = false) => {
     }
   }
 
+  const rawFileUrl = data.fileUrl ? String(data.fileUrl).trim() : '';
   const rawImage = data.image ? String(data.image).trim() : '';
   const rawFile = data.file ? String(data.file).trim() : '';
   const rawPreview = data.preview ? String(data.preview).trim() : '';
@@ -147,15 +148,32 @@ export const validateCertification = (data = {}, isUpdate = false) => {
       v.toLowerCase().endsWith('.pdf') ||
       v.toLowerCase().includes('.pdf?'));
 
-  const hasPdf = isPdfVal(rawFile) || isPdfVal(rawImage) || isPdfVal(rawPreview);
-  const pdfDoc = isPdfVal(rawFile)
+  const isExplicitPdf =
+    String(data.fileType || '').toLowerCase() === 'pdf' ||
+    String(data.resourceType || '').toLowerCase() === 'raw';
+
+  const hasPdf =
+    isExplicitPdf ||
+    isPdfVal(rawFileUrl) ||
+    isPdfVal(rawFile) ||
+    isPdfVal(rawImage) ||
+    isPdfVal(rawPreview);
+
+  const pdfDoc = isPdfVal(rawFileUrl)
+    ? rawFileUrl
+    : isExplicitPdf && rawFileUrl
+    ? rawFileUrl
+    : isPdfVal(rawFile)
     ? rawFile
     : isPdfVal(rawImage)
     ? rawImage
     : isPdfVal(rawPreview)
     ? rawPreview
     : '';
-  const imgDoc = !isPdfVal(rawPreview) && rawPreview
+
+  const imgDoc = !hasPdf && rawFileUrl
+    ? rawFileUrl
+    : !isPdfVal(rawPreview) && rawPreview
     ? rawPreview
     : !isPdfVal(rawImage) && rawImage
     ? rawImage
@@ -164,8 +182,8 @@ export const validateCertification = (data = {}, isUpdate = false) => {
     : '';
 
   const primaryDoc =
-    imgDoc || pdfDoc || '/certificates/previews/ibm-web-dev.png';
-  const fileDoc = pdfDoc || rawFile || imgDoc || rawLink || primaryDoc;
+    rawFileUrl || imgDoc || pdfDoc || '/certificates/previews/ibm-web-dev.png';
+  const fileDoc = rawFileUrl || pdfDoc || rawFile || imgDoc || rawLink || primaryDoc;
   const previewDoc = imgDoc || (hasPdf ? '' : primaryDoc);
   const imageDoc = imgDoc || (hasPdf ? '' : primaryDoc);
   const linkDoc = rawLink ? sanitizeUrl(String(rawLink), fileDoc) : fileDoc;
@@ -174,6 +192,7 @@ export const validateCertification = (data = {}, isUpdate = false) => {
     title,
     issuer,
     date: sanitizeString(data.date || data.issueDate || new Date().getFullYear().toString(), 50),
+    description: sanitizeString(data.description || '', 2000),
     category,
     categoryLabel: sanitizeString(data.categoryLabel || 'Professional Certification', 120),
     credentialId: sanitizeString(data.credentialId || '', 150),
@@ -183,6 +202,11 @@ export const validateCertification = (data = {}, isUpdate = false) => {
     link: linkDoc,
     credentialUrl: linkDoc,
     verifyUrl: linkDoc,
+    fileUrl: rawFileUrl ? sanitizeUrl(rawFileUrl, '') : '',
+    publicId: sanitizeString(data.publicId || '', 500),
+    resourceType: sanitizeString(data.resourceType || '', 50),
+    fileType: sanitizeString(data.fileType || (hasPdf ? 'pdf' : rawFileUrl ? 'image' : ''), 50),
+    originalName: sanitizeString(data.originalName || '', 300),
     skills: sanitizeStringArray(data.skills || []),
     featured: Boolean(data.featured),
   };

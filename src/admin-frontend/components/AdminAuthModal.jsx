@@ -341,7 +341,7 @@ export const AdminAuthModal = ({
           </button>
         </div>
 
-        {/* Tab Switcher */}
+        {/* Tab Switcher (Single Admin Only — Login & Password Management) */}
         <div className="auth-tab-nav">
           <button
             type="button"
@@ -354,18 +354,6 @@ export const AdminAuthModal = ({
           >
             <LogIn size={15} />
             <span>Sign In</span>
-          </button>
-          <button
-            type="button"
-            className={`auth-tab-btn ${authMode === 'register' ? 'active' : ''}`}
-            onClick={() => {
-              setAuthMode('register');
-              setErrorMessage('');
-              setSuccessMessage('');
-            }}
-          >
-            <UserPlus size={15} />
-            <span>Register</span>
           </button>
           <button
             type="button"

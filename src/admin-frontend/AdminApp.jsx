@@ -69,6 +69,8 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     addCertification,
     updateCertification,
     deleteCertification,
+    migrateCertificates,
+    bulkUploadCertificates,
     addEducation,
     updateEducation,
     deleteEducation,
@@ -79,6 +81,8 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     updateSkill,
     deleteSkill,
     updateProfilePhotos,
+    uploadResume,
+    deleteResume,
     seedInitialData,
     contactMessages: ctxContactMessages,
     fetchContactMessages: ctxFetchContactMessages,
@@ -186,13 +190,27 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     title: '',
     issuer: 'IBM SkillsBuild / Coursera',
     date: '2025',
+    description: '',
     category: 'web',
     credentialId: '',
     skills: '',
     image: '',
     preview: '',
     link: '',
+    rawFile: null,
   });
+
+  const [confirmDeleteCertId, setConfirmDeleteCertId] = useState(null);
+  const [isMigratingCerts, setIsMigratingCerts] = useState(false);
+  const [isBulkUploadPanelOpen, setIsBulkUploadPanelOpen] = useState(false);
+  const [isBulkUploadingCerts, setIsBulkUploadingCerts] = useState(false);
+  const [bulkUploadLimit, setBulkUploadLimit] = useState('');
+  const [bulkUploadReport, setBulkUploadReport] = useState(null);
+  const [confirmRunBulkUpload, setConfirmRunBulkUpload] = useState(false);
+  const [resumeRawFile, setResumeRawFile] = useState(null);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
+  const [isDeletingResume, setIsDeletingResume] = useState(false);
+  const [confirmDeleteResume, setConfirmDeleteResume] = useState(false);
 
   const [eduForm, setEduForm] = useState({
     degree: 'Bachelor of Technology in Computer Science & Engineering',
@@ -251,10 +269,27 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     if (!isAdmin) {
       showToast(`Admin Login Required to ${actionLabel}! Please Sign In first.`, true);
       setIsAuthModalOpen(true);
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+        window.history.replaceState(null, '', '/admin/login');
+      }
       return false;
     }
     return true;
   };
+
+  // Redirect /admin/... to /admin/login when not logged in, and open login modal
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const pathname = window.location.pathname.toLowerCase();
+    if (!isAdmin) {
+      if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+        window.history.replaceState(null, '', '/admin/login');
+      }
+      setIsAuthModalOpen(true);
+    } else if (pathname === '/admin/login') {
+      window.history.replaceState(null, '', '/admin');
+    }
+  }, [isAdmin]);
 
   // Periodic ping to /api/portfolio?light=1 + /api/stats + /api/health for live latency & uptime
   const fetchBackendData = useCallback(async () => {
@@ -621,6 +656,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         title: certForm.title.trim(),
         issuer: certForm.issuer.trim(),
         date: certForm.date.trim() || '2025',
+        description: (certForm.description || '').trim(),
         category: catKey,
         categoryLabel: certCategoryLabels[catKey] || 'Web Development',
         credentialId: certForm.credentialId.trim() || `SK-${Date.now().toString().slice(-6)}`,
@@ -629,27 +665,38 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         file: pdfOrDocFile || primaryDoc,
         preview: isUploadedPdf ? resolvedPreview : primaryDoc,
         link: externalLink || (!uploadedDoc.startsWith('data:') ? pdfOrDocFile : ''),
+        rawFile: certForm.rawFile || null,
       };
 
       if (editingCertId) {
         await updateCertification(editingCertId, payload);
-        showToast(`Certification "${certForm.title}" updated in MongoDB!`);
+        showToast(
+          certForm.rawFile
+            ? `Certification "${certForm.title}" file replaced on Cloudinary & updated in MongoDB!`
+            : `Certification "${certForm.title}" updated in MongoDB!`
+        );
         setEditingCertId(null);
       } else {
         await addCertification(payload);
-        showToast(`Certification "${certForm.title}" saved to MongoDB!`);
+        showToast(
+          certForm.rawFile
+            ? `Certification "${certForm.title}" uploaded to Cloudinary & saved to MongoDB!`
+            : `Certification "${certForm.title}" saved to MongoDB!`
+        );
       }
 
       setCertForm({
         title: '',
         issuer: 'IBM SkillsBuild / Coursera',
         date: '2025',
+        description: '',
         category: catKey,
         credentialId: '',
         skills: '',
         image: '',
         preview: '',
         link: '',
+        rawFile: null,
       });
       await refreshPortfolioData(false);
       fetchBackendData();
@@ -664,19 +711,21 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     if (!requireAdminAuth('edit certification')) return;
     const cId = cert.id || cert._id;
     setEditingCertId(cId);
-    // Prefer PDF file if certificate has an uploaded PDF, otherwise image/preview
-    const existingFile = cert.file || '';
-    const existingImg = cert.image || cert.preview || '';
+    // Prefer fileUrl or PDF file if certificate has an uploaded PDF, otherwise image/preview
+    const existingFile = cert.fileUrl || cert.file || '';
+    const existingImg = cert.image || cert.preview || (cert.fileType === 'image' ? cert.fileUrl : '') || '';
     const isFilePdf =
-      typeof existingFile === 'string' &&
-      (existingFile.startsWith('data:application/pdf') ||
-        existingFile.toLowerCase().endsWith('.pdf') ||
-        existingFile.toLowerCase().includes('.pdf?'));
+      cert.fileType === 'pdf' ||
+      (typeof existingFile === 'string' &&
+        (existingFile.startsWith('data:application/pdf') ||
+          existingFile.toLowerCase().endsWith('.pdf') ||
+          existingFile.toLowerCase().includes('.pdf?')));
 
     setCertForm({
       title: cert.title || '',
       issuer: cert.issuer || '',
       date: cert.date || '2025',
+      description: cert.description || '',
       category: cert.category || 'web',
       credentialId: cert.credentialId || '',
       skills: Array.isArray(cert.skills) ? cert.skills.join(', ') : cert.skills || '',
@@ -684,9 +733,10 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
         ? existingFile
         : existingImg || existingFile || '',
       preview: !existingImg.startsWith('data:application/pdf') ? existingImg : '',
-      link: cert.verifyUrl || cert.link || existingFile || '',
+      link: cert.fileUrl || cert.verifyUrl || cert.link || existingFile || '',
+      rawFile: null,
     });
-    showToast(`Editing Certificate: "${cert.title}" — Update fields above & click Save Changes.`);
+    showToast(`Editing Certificate: "${cert.title}" — Update fields or optionally replace the file & click Save Changes.`);
     setTimeout(() => {
       const formEl = document.getElementById('cert-admin-form');
       if (formEl) {
@@ -703,20 +753,24 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       title: '',
       issuer: 'IBM SkillsBuild / Coursera',
       date: '2025',
+      description: '',
       category: 'web',
       credentialId: '',
       skills: '',
       image: '',
       preview: '',
       link: '',
+      rawFile: null,
     });
   };
 
   const handleDeleteCert = async (cert) => {
     if (!requireAdminAuth('delete certification')) return;
+    const cId = cert.id || cert._id || cert.title;
+    setIsSubmitting(true);
     try {
-      const cId = cert.id || cert._id || cert.title;
-      await deleteCertification(cert);
+      const result = await deleteCertification(cert);
+      setConfirmDeleteCertId(null);
       if (editingCertId && String(editingCertId) === String(cId)) {
         handleCancelEditCert();
       }
@@ -725,9 +779,83 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       }
       await refreshPortfolioData();
       fetchBackendData();
-      showToast(`Certification "${cert.title}" deleted permanently from MongoDB & Portfolio!`);
+      if (result && result.notice) {
+        showToast(`${cert.title}: ${result.notice}`);
+      } else {
+        showToast(`Certification "${cert.title}" deleted permanently from Cloudinary & MongoDB!`);
+      }
     } catch (err) {
       showToast('Failed to delete certification: ' + err.message, true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleMigrateCertificates = async () => {
+    if (!requireAdminAuth('migrate legacy certificates')) return;
+    setIsMigratingCerts(true);
+    try {
+      const res = await migrateCertificates();
+      showToast(
+        res?.message ||
+          `Migration finished: ${res?.updatedCount ?? 0} updated, ${res?.skippedCount ?? 0} skipped.`
+      );
+      await refreshPortfolioData();
+      fetchBackendData();
+    } catch (err) {
+      showToast('Migration error: ' + err.message, true);
+    } finally {
+      setIsMigratingCerts(false);
+    }
+  };
+
+  const handlePreviewBulkUploadCerts = async () => {
+    if (!requireAdminAuth('preview bulk upload of old certificates')) return;
+    setIsBulkUploadingCerts(true);
+    setConfirmRunBulkUpload(false);
+    try {
+      const parsedLimit =
+        bulkUploadLimit && String(bulkUploadLimit).trim() !== ''
+          ? Number(bulkUploadLimit)
+          : undefined;
+      const report = await bulkUploadCertificates({
+        dryRun: true,
+        limit: parsedLimit,
+      });
+      setBulkUploadReport(report);
+      showToast(
+        `Dry-run preview complete: ${report?.wouldUpload ?? 0} ready to upload, ${report?.skipped ?? 0} skipped, ${report?.failed ?? 0} failed.`
+      );
+    } catch (err) {
+      showToast('Bulk upload preview error: ' + err.message, true);
+    } finally {
+      setIsBulkUploadingCerts(false);
+    }
+  };
+
+  const handleExecuteBulkUploadCerts = async () => {
+    if (!requireAdminAuth('run bulk upload of old certificates to Cloudinary')) return;
+    setIsBulkUploadingCerts(true);
+    try {
+      const parsedLimit =
+        bulkUploadLimit && String(bulkUploadLimit).trim() !== ''
+          ? Number(bulkUploadLimit)
+          : undefined;
+      const report = await bulkUploadCertificates({
+        dryRun: false,
+        limit: parsedLimit,
+      });
+      setBulkUploadReport(report);
+      setConfirmRunBulkUpload(false);
+      showToast(
+        `Bulk upload finished: ${report?.uploaded ?? 0} uploaded to Cloudinary, ${report?.skipped ?? 0} skipped, ${report?.failed ?? 0} failed.`
+      );
+      await refreshPortfolioData();
+      fetchBackendData();
+    } catch (err) {
+      showToast('Bulk upload error: ' + err.message, true);
+    } finally {
+      setIsBulkUploadingCerts(false);
     }
   };
 
@@ -1199,7 +1327,15 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
     if (!requireAdminAuth('update profile photos')) return;
     setIsSubmitting(true);
     try {
-      await updateProfilePhotos(photoForm);
+      if (resumeRawFile) {
+        const resUpload = await uploadResume(resumeRawFile);
+        const newResumeUrl = resUpload?.resume?.fileUrl || resUpload?.data?.resumeUrl || photoForm.resumeUrl;
+        setResumeRawFile(null);
+        setPhotoForm((prev) => ({ ...prev, resumeUrl: newResumeUrl }));
+        await updateProfilePhotos({ ...photoForm, resumeUrl: newResumeUrl });
+      } else {
+        await updateProfilePhotos(photoForm);
+      }
       lastSyncedProfileSigRef.current = JSON.stringify({
         heroImage: photoForm.heroImage || '',
         aboutImage: photoForm.aboutImage || '',
@@ -1216,6 +1352,48 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
       showToast('Failed to update photos: ' + err.message, true);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUploadResumeOnly = async () => {
+    if (!requireAdminAuth('upload or replace resume')) return;
+    if (!resumeRawFile) {
+      showToast('Please select a PDF or Image file to upload to Cloudinary.', true);
+      return;
+    }
+    setIsUploadingResume(true);
+    try {
+      const res = await uploadResume(resumeRawFile);
+      const uploadedUrl = res?.resume?.fileUrl || res?.data?.resumeUrl || '';
+      setResumeRawFile(null);
+      if (uploadedUrl) {
+        setPhotoForm((prev) => ({ ...prev, resumeUrl: uploadedUrl }));
+      }
+      await refreshPortfolioData();
+      fetchBackendData();
+      showToast(res?.message || 'Resume uploaded to Cloudinary & saved in MongoDB!');
+    } catch (err) {
+      showToast('Resume upload error: ' + err.message, true);
+    } finally {
+      setIsUploadingResume(false);
+    }
+  };
+
+  const handleDeleteActiveResume = async () => {
+    if (!requireAdminAuth('delete active resume')) return;
+    setIsDeletingResume(true);
+    try {
+      const res = await deleteResume();
+      setConfirmDeleteResume(false);
+      setResumeRawFile(null);
+      setPhotoForm((prev) => ({ ...prev, resumeUrl: '' }));
+      await refreshPortfolioData();
+      fetchBackendData();
+      showToast(res?.notice || res?.message || 'Resume deleted from Cloudinary and cleared in MongoDB.');
+    } catch (err) {
+      showToast('Resume delete error: ' + err.message, true);
+    } finally {
+      setIsDeletingResume(false);
     }
   };
 
@@ -1960,7 +2138,302 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                     Add, edit, preview PDF/Image, and delete credentials across Web Dev, AI &amp; ML, ISRO, Internships, and Other categories.
                   </p>
                 </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      if (!requireAdminAuth('open bulk upload tool')) return;
+                      setIsBulkUploadPanelOpen((prev) => !prev);
+                    }}
+                    disabled={isBulkUploadingCerts || isSubmitting}
+                    title="Move old local/external certificate files (PDF, JPG, PNG, WEBP) to Cloudinary portfolio/certificates and update MongoDB"
+                  >
+                    <RefreshCw size={14} className={isBulkUploadingCerts ? 'spin' : ''} />
+                    <span>Bulk Upload Old Certificates to Cloudinary</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleMigrateCertificates}
+                    disabled={isMigratingCerts || isBulkUploadingCerts || isSubmitting}
+                    title="Idempotent migration: fills in publicId, resourceType, fileUrl & fileType for legacy Cloudinary URLs"
+                  >
+                    <RefreshCw size={14} className={isMigratingCerts ? 'spin' : ''} />
+                    <span>{isMigratingCerts ? 'Migrating...' : 'Migrate Legacy Cloudinary URLs'}</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Two-Step Bulk Upload Old Certificates to Cloudinary Panel */}
+              {isBulkUploadPanelOpen && (
+                <div
+                  className="admin-card-form"
+                  style={{
+                    marginBottom: '1.5rem',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                  }}
+                >
+                  <div
+                    className="form-header-bar"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem',
+                    }}
+                  >
+                    <div>
+                      <h3 className="form-legend" style={{ marginBottom: '0.25rem' }}>
+                        <RefreshCw size={16} className={isBulkUploadingCerts ? 'spin text-accent' : 'text-accent'} />{' '}
+                        One-Time Bulk Upload: Old Certificates &rarr; Cloudinary (<code>portfolio/certificates</code>)
+                      </h3>
+                      <p style={{ fontSize: '0.82rem', opacity: 0.8, margin: 0 }}>
+                        Step 1: Run <strong>Preview (dry run)</strong> to inspect which certificates will be uploaded without changing MongoDB. Step 2: Confirm and click <strong>Run Upload</strong>.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setIsBulkUploadPanelOpen(false);
+                        setConfirmRunBulkUpload(false);
+                      }}
+                      disabled={isBulkUploadingCerts}
+                    >
+                      Close Panel
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem',
+                      alignItems: 'flex-end',
+                      marginTop: '0.85rem',
+                      marginBottom: '1rem',
+                    }}
+                  >
+                    <div className="form-group" style={{ marginBottom: 0, minWidth: '170px' }}>
+                      <label style={{ fontSize: '0.78rem' }}>Optional Batch Limit</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        placeholder="All eligible"
+                        value={bulkUploadLimit}
+                        onChange={(e) => setBulkUploadLimit(e.target.value)}
+                        disabled={isBulkUploadingCerts}
+                        style={{ padding: '0.45rem 0.65rem', fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    {/* Step 1: Preview (Dry Run) */}
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handlePreviewBulkUploadCerts}
+                      disabled={isBulkUploadingCerts}
+                    >
+                      <Eye size={14} />
+                      <span>
+                        {isBulkUploadingCerts && (!bulkUploadReport || bulkUploadReport.dryRun)
+                          ? 'Running Preview (Dry Run)...'
+                          : '1. Preview (dry run)'}
+                      </span>
+                    </button>
+
+                    {/* Step 2: Run Upload (requires Preview first + confirmation) */}
+                    {bulkUploadReport && !confirmRunBulkUpload && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => setConfirmRunBulkUpload(true)}
+                        disabled={
+                          isBulkUploadingCerts ||
+                          (bulkUploadReport.dryRun && (bulkUploadReport.wouldUpload || 0) === 0)
+                        }
+                        title={
+                          bulkUploadReport.dryRun && (bulkUploadReport.wouldUpload || 0) === 0
+                            ? 'No eligible certificates ready to upload'
+                            : 'Proceed to confirm live upload to Cloudinary'
+                        }
+                      >
+                        <CheckCircle2 size={14} />
+                        <span>2. Run Upload ({bulkUploadReport.wouldUpload ?? bulkUploadReport.eligible ?? 0} Ready)</span>
+                      </button>
+                    )}
+
+                    {bulkUploadReport && confirmRunBulkUpload && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.4rem 0.75rem',
+                          borderRadius: '8px',
+                          background: 'rgba(245, 158, 11, 0.14)',
+                          border: '1px solid rgba(245, 158, 11, 0.45)',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: 600 }}>
+                          Confirm uploading {bulkUploadReport.wouldUpload ?? bulkUploadReport.eligible ?? 0} file(s) to Cloudinary &amp; updating MongoDB?
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={handleExecuteBulkUploadCerts}
+                          disabled={isBulkUploadingCerts}
+                        >
+                          {isBulkUploadingCerts ? 'Uploading to Cloudinary...' : 'Confirm & Run Upload'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setConfirmRunBulkUpload(false)}
+                          disabled={isBulkUploadingCerts}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Summary Metrics & Per-Document Results Table */}
+                  {bulkUploadReport && (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.6rem',
+                          marginBottom: '0.9rem',
+                        }}
+                      >
+                        <span className="status-pill" style={{ background: 'rgba(148, 163, 184, 0.16)', color: '#e2e8f0' }}>
+                          Mode: <strong>{bulkUploadReport.dryRun ? 'DRY RUN (Preview Only)' : 'LIVE UPLOAD'}</strong>
+                        </span>
+                        <span className="status-pill" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                          Total Checked: <strong>{bulkUploadReport.totalChecked ?? 0}</strong>
+                        </span>
+                        <span className="status-pill" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
+                          Eligible: <strong>{bulkUploadReport.eligible ?? 0}</strong>
+                        </span>
+                        {bulkUploadReport.dryRun ? (
+                          <span className="status-pill" style={{ background: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa' }}>
+                            Would Upload: <strong>{bulkUploadReport.wouldUpload ?? 0}</strong>
+                          </span>
+                        ) : (
+                          <span className="status-pill" style={{ background: 'rgba(34, 197, 94, 0.18)', color: '#4ade80' }}>
+                            Uploaded: <strong>{bulkUploadReport.uploaded ?? 0}</strong>
+                          </span>
+                        )}
+                        <span className="status-pill" style={{ background: 'rgba(234, 179, 8, 0.16)', color: '#facc15' }}>
+                          Skipped: <strong>{bulkUploadReport.skipped ?? 0}</strong>
+                        </span>
+                        <span
+                          className="status-pill"
+                          style={{
+                            background:
+                              (bulkUploadReport.failed ?? 0) > 0
+                                ? 'rgba(239, 68, 68, 0.2)'
+                                : 'rgba(148, 163, 184, 0.12)',
+                            color: (bulkUploadReport.failed ?? 0) > 0 ? '#f87171' : '#94a3b8',
+                          }}
+                        >
+                          Failed: <strong>{bulkUploadReport.failed ?? 0}</strong>
+                        </span>
+                      </div>
+
+                      <div className="certs-admin-table-wrapper" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>_id</th>
+                              <th>Title</th>
+                              <th>Old Source</th>
+                              <th>Status</th>
+                              <th>Reason / New Cloudinary URL</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(bulkUploadReport.results || []).map((item, idx) => {
+                              const statusColor =
+                                item.status === 'uploaded'
+                                  ? '#4ade80'
+                                  : item.status === 'would-upload'
+                                  ? '#38bdf8'
+                                  : item.status === 'failed'
+                                  ? '#f87171'
+                                  : '#facc15';
+                              return (
+                                <tr key={`${item._id || idx}-${idx}`}>
+                                  <td data-label="_id" style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                                    {item._id || '—'}
+                                  </td>
+                                  <td data-label="Title">
+                                    <strong>{item.title}</strong>
+                                  </td>
+                                  <td
+                                    data-label="Old Source"
+                                    style={{
+                                      fontFamily: 'monospace',
+                                      fontSize: '0.76rem',
+                                      wordBreak: 'break-all',
+                                      maxWidth: '220px',
+                                    }}
+                                  >
+                                    {item.oldSource || '—'}
+                                  </td>
+                                  <td data-label="Status">
+                                    <span
+                                      style={{
+                                        display: 'inline-block',
+                                        padding: '2px 8px',
+                                        borderRadius: '999px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 700,
+                                        color: statusColor,
+                                        border: `1px solid ${statusColor}`,
+                                      }}
+                                    >
+                                      {item.status}
+                                    </span>
+                                  </td>
+                                  <td data-label="Reason / New URL" style={{ fontSize: '0.78rem' }}>
+                                    <div>{item.reason}</div>
+                                    {item.newUrl && (
+                                      <a
+                                        href={item.newUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                          color: '#38bdf8',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          marginTop: '3px',
+                                          wordBreak: 'break-all',
+                                        }}
+                                      >
+                                        <ExternalLink size={12} />
+                                        <span>{item.newUrl}</span>
+                                      </a>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Styled Category Filter Bar matching Portfolio Frontend */}
               <div className="admin-category-filter-bar">
@@ -2004,11 +2477,11 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                   <h3 className="form-legend">
                     {editingCertId ? (
                       <>
-                        <Edit3 size={16} className="text-accent" /> Edit Certificate (Updating MongoDB)
+                        <Edit3 size={16} className="text-accent" /> Edit Certificate (Updating MongoDB &amp; Cloudinary)
                       </>
                     ) : (
                       <>
-                        <Plus size={16} /> Add Certification to Database
+                        <Plus size={16} /> Add Certification to Database (Cloudinary Upload)
                       </>
                     )}
                   </h3>
@@ -2029,7 +2502,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Issuer *</label>
+                    <label>Issuer / Organization *</label>
                     <input
                       type="text"
                       placeholder="DeepLearning.AI / Coursera / ISRO"
@@ -2055,7 +2528,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
 
                 <div className="form-grid-3">
                   <div className="form-group">
-                    <label>Year / Date</label>
+                    <label>Issue Date / Year</label>
                     <input
                       type="text"
                       placeholder="e.g. July 2024 or 2025"
@@ -2075,7 +2548,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Verification Link / PDF URL (optional)</label>
+                    <label>Verification Link / URL (optional)</label>
                     <input
                       type="text"
                       placeholder="https://... or /certificates/..."
@@ -2085,39 +2558,75 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Skills / Competencies (comma separated)</label>
-                  <input
-                    type="text"
-                    placeholder="PyTorch, CNN, RNN, Transformers, Deep Learning"
-                    value={certForm.skills}
-                    onChange={(e) => setCertForm({ ...certForm, skills: e.target.value })}
-                  />
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label>Description (optional)</label>
+                    <input
+                      type="text"
+                      placeholder="Brief description of the certification or achievement..."
+                      value={certForm.description || ''}
+                      onChange={(e) => setCertForm({ ...certForm, description: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Skills / Competencies (comma separated)</label>
+                    <input
+                      type="text"
+                      placeholder="PyTorch, CNN, RNN, Transformers, Deep Learning"
+                      value={certForm.skills}
+                      onChange={(e) => setCertForm({ ...certForm, skills: e.target.value })}
+                    />
+                  </div>
                 </div>
 
-                {/* File Upload Zone for Certificate (JPG / PNG / PDF) */}
+                {/* File Upload Zone for Certificate (PDF / JPG / JPEG / PNG / WEBP) */}
                 <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                   <FileUploadZone
-                    label="Certificate Document (Upload PDF or JPG/PNG Image)"
+                    label={
+                      editingCertId
+                        ? 'Replace Certificate File (Optional — Upload PDF or JPG/PNG/WebP Image to Cloudinary)'
+                        : 'Certificate Document (Upload PDF or JPG/PNG/WebP Image to Cloudinary)'
+                    }
                     allowPdf={true}
                     value={certForm.image}
                     onChange={(url, meta) =>
                       setCertForm((prev) => ({
                         ...prev,
                         image: url,
+                        rawFile: meta?.rawFile || null,
                         preview:
                           meta?.previewDataUrl ||
                           (url && !url.startsWith('data:application/pdf') ? url : prev.preview || ''),
                       }))
                     }
-                    helpText="Upload certificate PDF or Image (JPG/PNG) — PDF viewer opens directly on both Admin & Portfolio"
+                    helpText="Allowed: PDF (max 10 MB) or JPG, JPEG, PNG, WEBP (max 5 MB) — Uploaded to Cloudinary portfolio/certificates"
                   />
+                  {certForm.rawFile && (
+                    <div
+                      style={{
+                        marginTop: '0.4rem',
+                        fontSize: '0.78rem',
+                        color: '#38bdf8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <CheckCircle2 size={14} />
+                      <span>
+                        Ready to upload to Cloudinary: <strong>{certForm.rawFile.name}</strong> (
+                        {(certForm.rawFile.size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-submit-footer">
                   <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                     {isSubmitting
-                      ? 'Saving to MongoDB...'
+                      ? certForm.rawFile
+                        ? 'Uploading to Cloudinary & Saving...'
+                        : 'Saving to MongoDB...'
                       : editingCertId
                       ? 'Save Changes to MongoDB'
                       : 'Add Certification'}
@@ -2127,6 +2636,7 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                       type="button"
                       className="btn btn-secondary"
                       onClick={handleCancelEditCert}
+                      disabled={isSubmitting}
                     >
                       Cancel Edit
                     </button>
@@ -2148,19 +2658,37 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                   </thead>
                   <tbody>
                     {filteredCerts.map((cert) => {
-                      const docSource = cert.file || cert.image || cert.preview || '';
+                      const cId = cert.id || cert._id;
+                      const docSource = cert.fileUrl || cert.file || cert.image || cert.preview || '';
                       const isPdfDoc =
-                        typeof docSource === 'string' &&
-                        (docSource.startsWith('data:application/pdf') ||
-                          docSource.toLowerCase().endsWith('.pdf') ||
-                          (typeof cert.image === 'string' &&
-                            cert.image.startsWith('data:application/pdf')));
+                        cert.fileType === 'pdf' ||
+                        cert.resourceType === 'raw' ||
+                        (typeof docSource === 'string' &&
+                          (docSource.startsWith('data:application/pdf') ||
+                            docSource.toLowerCase().endsWith('.pdf') ||
+                            docSource.toLowerCase().includes('.pdf?') ||
+                            (typeof cert.image === 'string' &&
+                              cert.image.startsWith('data:application/pdf'))));
+                      const thumbUrl =
+                        !isPdfDoc && (cert.fileUrl || cert.preview || cert.image)
+                          ? cert.fileUrl || cert.preview || cert.image
+                          : cert.preview && !cert.preview.startsWith('data:application/pdf')
+                          ? cert.preview
+                          : '';
+                      const directViewUrl = cert.fileUrl || cert.file || cert.link || '';
                       const catKey = cert.category || 'other';
+                      const isConfirmingDelete =
+                        confirmDeleteCertId !== null && String(confirmDeleteCertId) === String(cId);
 
                       return (
-                        <tr key={cert.id || cert._id}>
+                        <tr key={cId}>
                           <td data-label="Title">
                             <strong>{cert.title}</strong>
+                            {cert.description && (
+                              <div style={{ fontSize: '0.76rem', opacity: 0.75, marginTop: '2px' }}>
+                                {cert.description}
+                              </div>
+                            )}
                           </td>
                           <td data-label="Category">
                             <span className="admin-category-badge">
@@ -2170,33 +2698,50 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                           <td data-label="Issuer">{cert.issuer}</td>
                           <td data-label="Year / Date">{cert.date}</td>
                           <td data-label="Preview">
-                            {docSource ? (
-                              <button
-                                type="button"
-                                className="table-doc-pill"
-                                onClick={() => setPreviewCertificate(cert)}
-                                title="Click to preview PDF or Image Certificate"
-                                style={{ cursor: 'pointer', background: 'none' }}
-                              >
-                                {isPdfDoc ? (
-                                  <FileText size={13} style={{ color: '#f87171' }} />
-                                ) : (
-                                  <Eye size={13} style={{ color: '#38bdf8' }} />
-                                )}
-                                <span>{isPdfDoc ? 'View PDF' : 'View Cert'}</span>
-                              </button>
-                            ) : cert.link ? (
-                              <a
-                                href={cert.link}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="table-link"
-                              >
-                                Verify <ExternalLink size={12} />
-                              </a>
-                            ) : (
-                              <span>—</span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              {thumbUrl && !isPdfDoc && (
+                                <img
+                                  src={thumbUrl}
+                                  alt={cert.title}
+                                  onClick={() => setPreviewCertificate(cert)}
+                                  style={{
+                                    width: '38px',
+                                    height: '28px',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(56,189,248,0.3)',
+                                    cursor: 'pointer',
+                                  }}
+                                />
+                              )}
+                              {docSource ? (
+                                <button
+                                  type="button"
+                                  className="table-doc-pill"
+                                  onClick={() => setPreviewCertificate(cert)}
+                                  title="Click to preview PDF or Image Certificate"
+                                  style={{ cursor: 'pointer', background: 'none' }}
+                                >
+                                  {isPdfDoc ? (
+                                    <FileText size={13} style={{ color: '#f87171' }} />
+                                  ) : (
+                                    <Eye size={13} style={{ color: '#38bdf8' }} />
+                                  )}
+                                  <span>{isPdfDoc ? 'PDF • View' : 'View Cert'}</span>
+                                </button>
+                              ) : directViewUrl ? (
+                                <a
+                                  href={directViewUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="table-link"
+                                >
+                                  View <ExternalLink size={12} />
+                                </a>
+                              ) : (
+                                <span>—</span>
+                              )}
+                            </div>
                           </td>
                           <td data-label="Action">
                             <div className="table-actions-cell">
@@ -2204,19 +2749,52 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
                                 type="button"
                                 className="btn-table-edit"
                                 onClick={() => handleStartEditCert(cert)}
+                                disabled={isSubmitting}
                                 title="Edit Certificate in MongoDB"
                               >
                                 <Pencil size={13} />
                                 <span>Edit</span>
                               </button>
-                              <button
-                                type="button"
-                                className="btn-table-delete"
-                                onClick={() => handleDeleteCert(cert)}
-                                title="Delete Certificate"
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                              {isConfirmingDelete ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-table-delete"
+                                    onClick={() => handleDeleteCert(cert)}
+                                    disabled={isSubmitting}
+                                    title="Confirm permanent deletion from Cloudinary & MongoDB"
+                                    style={{
+                                      width: 'auto',
+                                      padding: '0 0.55rem',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      background: 'rgba(239, 68, 68, 0.22)',
+                                      color: '#f87171',
+                                    }}
+                                  >
+                                    {isSubmitting ? 'Deleting...' : 'Confirm'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-table-edit"
+                                    onClick={() => setConfirmDeleteCertId(null)}
+                                    disabled={isSubmitting}
+                                    style={{ padding: '0 0.45rem', fontSize: '0.74rem' }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-table-delete"
+                                  onClick={() => setConfirmDeleteCertId(cId)}
+                                  disabled={isSubmitting}
+                                  title="Delete Certificate"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -3100,12 +3678,107 @@ export const AdminControlPanel = ({ onNavigateToFrontend }) => {
 
                   <div className="form-group">
                     <FileUploadZone
-                      label="Official Resume Document (PDF or Image)"
+                      label="Official Resume Document (Single Active Resume — PDF or Image)"
                       allowPdf={true}
                       value={photoForm.resumeUrl}
-                      onChange={(url) => setPhotoForm({ ...photoForm, resumeUrl: url })}
-                      helpText="Upload Resume PDF or paste URL (opens in Portfolio View Resume modal)"
+                      onChange={(url, meta) => {
+                        setPhotoForm({ ...photoForm, resumeUrl: url });
+                        setResumeRawFile(meta?.rawFile || null);
+                      }}
+                      helpText="Upload Resume PDF (max 10 MB) or Image (max 5 MB) to Cloudinary portfolio/resume"
                     />
+                    <div
+                      style={{
+                        marginTop: '0.6rem',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      {resumeRawFile && (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ padding: '0.42rem 0.85rem', fontSize: '0.8rem' }}
+                          onClick={handleUploadResumeOnly}
+                          disabled={isUploadingResume || isDeletingResume || isSubmitting}
+                        >
+                          {isUploadingResume
+                            ? 'Uploading Resume to Cloudinary...'
+                            : profileConfig?.resumeUrl
+                            ? 'Replace Active Resume on Cloudinary'
+                            : 'Upload Resume to Cloudinary'}
+                        </button>
+                      )}
+                      {(profileConfig?.resume?.fileUrl || profileConfig?.resumeUrl) && (
+                        <>
+                          <a
+                            href={profileConfig?.resume?.fileUrl || profileConfig?.resumeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', textDecoration: 'none' }}
+                          >
+                            <FileText size={13} />
+                            <span>
+                              View Active Resume
+                              {profileConfig?.resume?.originalName
+                                ? ` (${profileConfig.resume.originalName})`
+                                : ''}
+                            </span>
+                          </a>
+                          {confirmDeleteResume ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-delete-card"
+                                style={{
+                                  width: 'auto',
+                                  height: 'auto',
+                                  padding: '0.4rem 0.75rem',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                }}
+                                onClick={handleDeleteActiveResume}
+                                disabled={isDeletingResume || isUploadingResume}
+                              >
+                                {isDeletingResume ? 'Deleting...' : 'Confirm Delete Resume'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                style={{ padding: '0.4rem 0.7rem', fontSize: '0.78rem' }}
+                                onClick={() => setConfirmDeleteResume(false)}
+                                disabled={isDeletingResume}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-delete-card"
+                              style={{
+                                width: 'auto',
+                                height: 'auto',
+                                padding: '0.4rem 0.75rem',
+                                fontSize: '0.78rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                              }}
+                              onClick={() => setConfirmDeleteResume(true)}
+                              disabled={isDeletingResume || isUploadingResume}
+                              title="Delete active resume from Cloudinary and clear DB record"
+                            >
+                              <Trash2 size={13} />
+                              <span>Delete Resume</span>
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 

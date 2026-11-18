@@ -122,13 +122,27 @@ const dataUrlToBlobUrl = (dataUrl) => {
 };
 
 export const CertificateModal = ({ certificate, onClose }) => {
-  // Determine available sources
-  const rawFile = certificate?.file || certificate?.link || '';
-  const rawPreview = certificate?.preview || certificate?.image || '';
+  // Determine available sources (prioritize Cloudinary fileUrl, fallback to legacy file/image/preview/link)
+  const rawFileUrl = certificate?.fileUrl || '';
+  const rawFile = rawFileUrl || certificate?.file || certificate?.link || '';
+  const rawPreview =
+    certificate?.preview ||
+    certificate?.image ||
+    (certificate?.fileType === 'image' ? rawFileUrl : '') ||
+    '';
+
+  const isExplicitPdf =
+    certificate?.fileType === 'pdf' || certificate?.resourceType === 'raw';
 
   const hasPdfSource =
-    isPdfSource(rawFile) || isPdfSource(rawPreview) || isPdfSource(certificate?.image);
-  const pdfCandidate = isPdfSource(rawFile)
+    isExplicitPdf ||
+    isPdfSource(rawFileUrl) ||
+    isPdfSource(rawFile) ||
+    isPdfSource(rawPreview) ||
+    isPdfSource(certificate?.image);
+  const pdfCandidate = isPdfSource(rawFileUrl) || (isExplicitPdf && rawFileUrl)
+    ? rawFileUrl
+    : isPdfSource(rawFile)
     ? rawFile
     : isPdfSource(rawPreview)
     ? rawPreview
@@ -141,6 +155,8 @@ export const CertificateModal = ({ certificate, onClose }) => {
       ? rawPreview
       : !isPdfSource(certificate?.image) && certificate?.image
       ? certificate.image
+      : !hasPdfSource && rawFileUrl
+      ? rawFileUrl
       : !isPdfSource(rawFile) && rawFile
       ? rawFile
       : '';
