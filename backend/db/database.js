@@ -37,6 +37,10 @@ const __dirname = path.dirname(__filename);
 const LOCAL_DATA_DIR = path.resolve(__dirname, '../../data-storage');
 let DATA_DIR = LOCAL_DATA_DIR;
 
+// Serverless (Vercel) par Atlas pull kam baar karein taaki connections / load kam rahe.
+// Local dev me 2 sec, Vercel par 30 sec.
+const ATLAS_PULL_TTL_MS = process.env.VERCEL ? 30000 : 2000;
+
 try {
   if (process.env.VERCEL) {
     DATA_DIR = '/tmp/data-storage';
@@ -81,6 +85,55 @@ function withTimeout(promise, ms = 4000) {
   return Promise.race([promise, timeoutPromise]).finally(() => {
     if (timer) clearTimeout(timer);
   });
+}
+
+/**
+ * Process-wide shared MongoClient.
+ * - Ek hi client reuse hota hai (global cache), isliye har cold start / module reload par naya pool nahi banta.
+ * - maxPoolSize chhota rakha hai taaki Atlas connection limit cross na ho.
+ * - URI badalne par purana client close hota hai (leak nahi hota).
+ */
+function getSharedClient(uri) {
+  if (!global._mongoShared) {
+    global._mongoShared = { uri: null, client: null, promise: null };
+  }
+  const shared = global._mongoShared;
+
+  if (shared.promise && shared.uri === uri) {
+    return shared.promise;
+  }
+
+  // URI badal gayi hai: purana client band karein
+  if (shared.client) {
+    shared.client.close().catch(() => {});
+    shared.client = null;
+    shared.promise = null;
+    shared.uri = null;
+  }
+
+  const client = new MongoClient(uri, {
+    maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE) || 3,
+    minPoolSize: 0,
+    maxIdleTimeMS: 10000,
+    serverSelectionTimeoutMS: 5000,
+    connectTimeoutMS: 6000,
+  });
+
+  shared.uri = uri;
+  shared.client = client;
+  shared.promise = client
+    .connect()
+    .then(() => client)
+    .catch((err) => {
+      // Fail hone par client band karein aur cache saaf karein taaki dobara try ho sake
+      client.close().catch(() => {});
+      shared.promise = null;
+      shared.client = null;
+      shared.uri = null;
+      throw err;
+    });
+
+  return shared.promise;
 }
 
 function toSafeObjectId(val) {
@@ -627,7 +680,8 @@ export class MongoCollection {
     if (this._lastLocalWriteAt && now - this._lastLocalWriteAt < 4500) {
       return;
     }
-    if (!force && this._lastAtlasPull && now - this._lastAtlasPull < 2000) {
+    // Throttle: Vercel par 30s, local par 2s (force=true is ko bypass karta hai)
+    if (!force && this._lastAtlasPull && now - this._lastAtlasPull < ATLAS_PULL_TTL_MS) {
       return;
     }
 
@@ -1283,10 +1337,9 @@ export class MongoDatabase {
       }
     } catch {}
 
-    this.uri =
-      process.env.MONGODB_URI ||
-      savedUri ||
-      'mongodb+srv://sachinkumargheura_db_user:Sachin123@cluster0.jlcorya.mongodb.net/sachin_portfolio_db?retryWrites=true&w=majority';
+    // SECURITY: URI kabhi code me hardcode na karein. Sirf env variable (MONGODB_URI) ya admin panel se saved URI.
+    // Agar kuch bhi nahi mila to local embedded JSON engine use hoga.
+    this.uri = process.env.MONGODB_URI || savedUri || '';
     this.dbType = 'MongoDB NoSQL Database';
     this.isConnected = true;
     this.isLiveAtlas = false;
@@ -1329,7 +1382,7 @@ export class MongoDatabase {
         email: 'sachinkumar.gheura@gmail.com',
         name: 'Sachin Kumar',
         role: 'admin',
-        // default password: admin123 (SHA-256 with salt)
+        // default password: admin123 (SHA-256 with salt) -> deploy ke baad admin panel se zaroor badlein
         passwordSalt: 'sachin_portfolio_salt_2026',
         passwordHash: '3989907f07980f390ab703b199ece0d71f732f9c4fe2071e13fe289be7e8e310',
         createdAt: new Date().toISOString(),
@@ -1439,6 +1492,10 @@ export class MongoDatabase {
 
   saveUriConfig(uri) {
     try {
+      // Agar URI env variable se aa rahi hai to disk par password ke saath save na karein
+      if (process.env.MONGODB_URI && uri === this.normalizeMongoUri(process.env.MONGODB_URI)) {
+        return;
+      }
       fs.writeFileSync(this.configFilePath, JSON.stringify({ uri, updatedAt: new Date().toISOString() }, null, 2), 'utf-8');
     } catch {}
   }
@@ -1483,11 +1540,9 @@ export class MongoDatabase {
     if (targetUri.startsWith('mongodb+srv://') || targetUri.startsWith('mongodb://')) {
       try {
         console.log(`[MongoDB Node.js] Connecting to MongoDB: ${targetUri.replace(/:([^@]+)@/, ':****@')}...`);
-        const client = new MongoClient(targetUri, {
-          serverSelectionTimeoutMS: 5000,
-          connectTimeoutMS: 6000,
-        });
-        await client.connect();
+
+        // Shared, pooled client (global cache). Purana client URI badalne par automatically close hota hai.
+        const client = await getSharedClient(targetUri);
         this.realClient = client;
         this.realDb = client.db('sachin_portfolio_db');
         this.isConnected = true;
@@ -1623,5 +1678,8 @@ export class MongoDatabase {
   }
 }
 
-export const db = new MongoDatabase();
-
+// Module reload / hot reload par naya MongoDatabase (aur naya pool) na bane
+if (!global._mongoDatabaseInstance) {
+  global._mongoDatabaseInstance = new MongoDatabase();
+}
+export const db = global._mongoDatabaseInstance;
